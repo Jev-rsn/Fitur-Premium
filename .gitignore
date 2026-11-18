@@ -1,0 +1,10 @@
+# Caches & Test Profiles
+.browser_test_profile/
+.temp_chrome/
+__pycache__/
+*.pyc
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
