@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Menggabungkan products_catalog.json, fabric_normals.js, dan Three.js viewer
-menjadi file gunakan-viewer (1).html dan index.html yang 100% self-contained tanpa ketergantungan file lokal eksternal.
+menjadi file index.html yang 100% self-contained tanpa ketergantungan file lokal eksternal.
 Mendukung:
 1. UV projection lurus sempurna di tengah dada dan pinggang (u=0.5 di sumbu depan, phiStart=-PI)
 2. Tanpa garis potongan atau bercak putih (seamless edge feathering & alpha segmentation)
@@ -388,7 +388,6 @@ const state = {{
   top: 0, bot: 0,
   topSize: "M", botSize: "L",
   topOn: true, botOn: true,
-  mannequin: "skin",
   gender: "male",
   skinTone: "warm",
   hairStyle: "undercut",
@@ -648,10 +647,6 @@ Object.keys(normals).forEach(k => {{
   const isTiling = k.startsWith('fabric_');
   normalTextures[k] = loadTexture(normals[k], isTiling, isTiling ? 3 : 1, isTiling ? 3 : 1, 0);
 }});
-
-// Stand & Props materials
-const chromeMat = new THREE.MeshStandardMaterial({{color: 0xdcdcdc, metalness: 0.95, roughness: 0.12}});
-const castIronMat = new THREE.MeshStandardMaterial({{color: 0x222224, metalness: 0.4, roughness: 0.5}});
 
 // Game Avatar Dictionaries & Materials
 const SKIN_TONES = {{
@@ -1543,17 +1538,6 @@ function switchBottomProduct(idx){{
   renderer.render(scene, camera);
 }}
 
-function updateMannequinFinish(){{
-  const newSkinMat = getMannequinMaterial();
-  mannequinGroup.traverse(o => {{
-    if(o.isMesh && o.material !== chromeMat && o.material !== castIronMat){{
-      o.material = newSkinMat;
-      o.material.needsUpdate = true;
-    }}
-  }});
-  renderer.render(scene, camera);
-}}
-
 function updateWrinklesToggling(){{
   const scale = state.wrinkles ? 0.95 : 0.001;
   topMaterials.forEach(m => {{
@@ -2194,10 +2178,7 @@ window.__VIEWER__ = {{
 </html>
 '''
 
-with open('gunakan-viewer (1).html', 'w', encoding='utf-8') as f:
-    f.write(html_content)
-
 with open('index.html', 'w', encoding='utf-8') as f:
     f.write(html_content)
 
-print(f"Selesai! gunakan-viewer (1).html dan index.html berhasil dikompilasi ({len(html_content)} bytes).")
+print(f"Selesai! index.html berhasil dikompilasi ({len(html_content)} bytes).")
