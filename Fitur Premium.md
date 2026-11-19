@@ -1,4 +1,4 @@
-# PRD Fitur Gunakan: Visualisasi Body 3D (Premium)
+# Fitur Premium: Visualisasi Body 3D
 
 Turunan dari *PRD Final: Platform Rekomendasi Outfit* (FR-13, FR-14, FR-17). Versi 1.0.
 

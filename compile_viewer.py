@@ -7,12 +7,14 @@ Mendukung:
 2. Tanpa garis potongan atau bercak putih (seamless edge feathering & alpha segmentation)
 3. Fitur Input / Unggah Foto Pakaian Sendiri dengan auto-segmentasi, pelurusan, dan slider presisi.
 """
-import json, re
+import json, re, base64, os
 
-with open('products_catalog.json', 'r', encoding='utf-8') as f:
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+with open(os.path.join(BASE_DIR, 'products_catalog.json'), 'r', encoding='utf-8') as f:
     catalog = json.load(f)
 
-with open('fabric_normals.js', 'r', encoding='utf-8') as f:
+with open(os.path.join(BASE_DIR, 'fabric_normals.js'), 'r', encoding='utf-8') as f:
     normals_js = f.read()
 
 # Ekstrak objek JSON dari fabric_normals.js
@@ -21,6 +23,12 @@ if normals_match:
     normals = json.loads(normals_match.group(1))
 else:
     normals = {}
+
+glb_b64 = ""
+glb_path = os.path.join(BASE_DIR, 'HumanModels.glb')
+if os.path.exists(glb_path):
+    with open(glb_path, 'rb') as f:
+        glb_b64 = base64.b64encode(f.read()).decode('ascii')
 
 html_content = f'''
 <!DOCTYPE html>
@@ -31,7 +39,7 @@ html_content = f'''
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Gunakan: Visualisasi Body 3D Realistis</title>
+<title>Fitur Premium: Visualisasi Body 3D Realistis</title>
 <style>
 :root{{
   --bg:#FFFFFF;--stage:#E2E6EC;--ink:#141316;--mut:#625c64;--line:#ded6cc;
@@ -54,8 +62,52 @@ html_content = f'''
 }}
 *{{box-sizing:border-box}}
 html,body{{height:100%;margin:0;scroll-behavior:smooth}}
-body{{background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;font-size:13.5px;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}}
-.app{{display:grid;grid-template-columns:1fr 400px;height:100%}}
+body{{
+  background:var(--bg);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;font-size:13.5px;
+  text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;height:100vh;overflow:hidden;
+}}
+body.is-embedded #studioHeader{{display:none !important}}
+body.is-embedded aside{{padding-top:12px}}
+.studio-header{{
+  height:48px;background:var(--panel);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;padding:0 14px;
+  z-index:20;flex-shrink:0;transition:background .3s, border .3s;
+}}
+.header-left, .header-right{{display:flex;align-items:center;gap:10px}}
+.nav-back-btn{{
+  display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:999px;
+  background:rgba(0,0,0,0.04);color:var(--ink);font-weight:600;font-size:11.5px;
+  text-decoration:none;border:1px solid var(--line);transition:all .2s ease;
+}}
+.nav-back-btn:hover{{background:var(--brand);color:#fff;border-color:var(--brand)}}
+.brand-title-wrap{{display:flex;align-items:center;gap:6px}}
+.brand-main{{font-family:"Instrument Serif",Georgia,serif;font-size:19px;color:var(--brand);font-weight:700}}
+.brand-badge-tag{{
+  font-size:9.5px;font-weight:800;background:var(--brand);color:#fff;
+  padding:2px 7px;border-radius:999px;letter-spacing:0.5px;
+}}
+.user-status-pill{{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;
+  background:rgba(109,0,26,0.06);border:1px solid rgba(109,0,26,0.18);
+  font-size:11px;font-weight:600;color:var(--brand);
+}}
+.user-status-dot{{width:7px;height:7px;border-radius:50%;background:#1f8247}}
+.header-link-btn{{
+  display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;
+  font-size:11.5px;font-weight:600;color:var(--ink);text-decoration:none;
+  border:1px solid var(--line);background:var(--panel);transition:all .2s ease;
+}}
+.header-link-btn:hover{{border-color:var(--brand);color:var(--brand)}}
+.toast-msg{{
+  position:fixed;top:60px;left:50%;transform:translateX(-50%) translateY(-20px);
+  background:rgba(18,17,20,0.92);color:#fff;padding:8px 18px;border-radius:999px;
+  font-size:11.5px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.2);
+  opacity:0;pointer-events:none;transition:all .3s cubic-bezier(0.16,1,0.3,1);z-index:100;
+}}
+.toast-msg.show{{opacity:1;transform:translateX(-50%) translateY(0)}}
+.app{{display:grid;grid-template-columns:1fr 400px;flex:1;min-height:0;height:calc(100% - 48px)}}
+body.is-embedded .app{{height:100%}}
 #stage{{
   position:relative;
   background:var(--stage-bg, radial-gradient(circle at 50% 38%, #F2F4F8 0%, #DFE4EC 55%, #C2C9D6 100%));
@@ -160,13 +212,230 @@ button.on{{background:var(--brand);color:var(--onbrand);border-color:var(--brand
 }}
 
 @media (max-width:760px){{
+  body{{height:auto;overflow-y:auto}}
   .app{{grid-template-columns:1fr;grid-template-rows:55vh auto;height:auto}}
   aside{{border-left:0;border-top:1px solid var(--line)}}
   .cam-pills{{bottom:38px}}
+  .studio-header{{padding:0 8px}}
+  .header-link-btn span{{display:none}}
+  .user-status-pill{{padding:3px 7px;font-size:10px}}
+}}
+
+/* Premium Paywall Gate Overlay */
+.premium-locked-overlay{{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:rgba(13,11,12,0.92);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}}
+.premium-lock-card{{
+  max-width:480px;
+  width:100%;
+  background:#181416;
+  border:1px solid rgba(247,243,238,0.18);
+  border-radius:24px;
+  padding:36px 28px;
+  text-align:center;
+  box-shadow:0 24px 60px rgba(0,0,0,0.6);
+  color:#f7f3ee;
+  animation:popLockCard .3s cubic-bezier(0.16,1,0.3,1);
+}}
+@keyframes popLockCard{{
+  from{{opacity:0;transform:scale(0.94)}}
+  to{{opacity:1;transform:scale(1)}}
+}}
+.lock-badge-icon{{
+  width:64px;
+  height:64px;
+  border-radius:50%;
+  background:rgba(179,135,40,0.15);
+  border:1px solid rgba(179,135,40,0.4);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  margin:0 auto 16px;
+}}
+.lock-tag{{
+  display:inline-block;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:0.8px;
+  color:#e5a968;
+  background:rgba(229,169,104,0.12);
+  padding:3px 10px;
+  border-radius:999px;
+  margin-bottom:12px;
+}}
+.lock-title{{
+  font-family:"Instrument Serif",Georgia,serif;
+  font-size:28px;
+  font-weight:400;
+  color:#fff;
+  margin:0 0 10px;
+  line-height:1.2;
+}}
+.lock-desc{{
+  font-size:13px;
+  line-height:1.6;
+  color:rgba(247,243,238,0.72);
+  margin:0 0 20px;
+}}
+.lock-desc b{{color:#fff}}
+.lock-benefits{{
+  text-align:left;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:14px;
+  padding:14px 16px;
+  margin-bottom:22px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}}
+.benefit-item{{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:12px;
+  color:rgba(247,243,238,0.9);
+}}
+.lock-actions{{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}}
+.btn-lock-upgrade{{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  background:linear-gradient(135deg, #6D001A 0%, #B38728 100%);
+  color:#fff;
+  text-decoration:none;
+  font-size:13px;
+  font-weight:700;
+  padding:12px 20px;
+  border-radius:999px;
+  box-shadow:0 6px 20px rgba(109,0,26,0.4);
+  transition:all .2s ease;
+}}
+.btn-lock-upgrade:hover{{
+  transform:translateY(-1px);
+  box-shadow:0 8px 25px rgba(109,0,26,0.55);
+}}
+.btn-lock-back{{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:transparent;
+  border:1px solid rgba(247,243,238,0.2);
+  color:rgba(247,243,238,0.75);
+  text-decoration:none;
+  font-size:12px;
+  font-weight:600;
+  padding:10px 18px;
+  border-radius:999px;
+  transition:all .2s ease;
+}}
+.btn-lock-back:hover{{
+  border-color:rgba(247,243,238,0.5);
+  color:#fff;
+}}
+body.is-locked #stage{{
+  pointer-events:none !important;
+}}
+body.is-locked aside{{
+  pointer-events:none !important;
+  opacity:0.35 !important;
+  filter:blur(2px) !important;
 }}
 </style>
 </head>
 <body>
+<!-- Modal Lock Paywall Khusus Premium Member -->
+<div id="premiumLockedOverlay" class="premium-locked-overlay">
+  <div class="premium-lock-card">
+    <div class="lock-badge-icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <span class="lock-tag">★ FITUR EKSKLUSIF OREC PREMIUM</span>
+    <h2 class="lock-title">Studio Visualisasi 3D Terkunci</h2>
+    <p class="lock-desc">
+      Fitur Manekin 3D Realistis & Simulasi Fitting Busana 360° ini dirancang khusus untuk <b>Member Premium Orec</b>. Silakan upgrade akun Anda untuk mengaktifkan seluruh fitur studio.
+    </p>
+
+    <div class="lock-benefits">
+      <div class="benefit-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1f8247" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>Fitting Manekin Digital 360° Real-time</span>
+      </div>
+      <div class="benefit-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1f8247" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>Presisi Ukuran Tubuh (TB, BB, Dada, Pinggang, Bahu)</span>
+      </div>
+      <div class="benefit-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1f8247" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>Uji Coba Busana Rekomendasi di Tubuh Manekin</span>
+      </div>
+      <div class="benefit-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1f8247" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+        <span>Simpan Kombinasi Outfit Favorit ke Akun</span>
+      </div>
+    </div>
+
+    <div class="lock-actions">
+      <a href="../WEB EBD/account.html?upgrade=1" id="btnLockUpgrade" target="_top" class="btn-lock-upgrade">
+        <span>Upgrade ke Member Premium</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <a href="../WEB EBD/rekomendasi.html" id="btnLockBack" target="_top" class="btn-lock-back">
+        Kembali ke Galeri Rekomendasi
+      </a>
+    </div>
+  </div>
+</div>
+<!-- Toast Notification -->
+<div id="toastMsg" class="toast-msg">Kombinasi Outfit Tersimpan</div>
+
+<!-- Header Navigasi Studio Terintegrasi -->
+<header class="studio-header" id="studioHeader">
+  <div class="header-left">
+    <a href="../WEB EBD/rekomendasi.html" id="btnBackToWeb" class="nav-back-btn" title="Kembali">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      <span id="backNavText">Rekomendasi</span>
+    </a>
+    <div class="brand-title-wrap">
+      <span class="brand-main">Orec</span>
+      <span class="brand-badge-tag">STUDIO 3D</span>
+    </div>
+  </div>
+
+  <div class="user-status-pill" id="userStatusPill">
+    <span class="user-status-dot" id="userStatusDot"></span>
+    <span id="userStatusText">Memuat Akun...</span>
+  </div>
+
+  <div class="header-right">
+    <a href="../WEB EBD/account.html#section-postur-tubuh" class="header-link-btn" title="Kelola Profil Data Tubuh">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M5.5 21v-2a6.5 6.5 0 0 1 13 0v2"/></svg>
+      <span>Profil Tubuh</span>
+    </a>
+    <a href="../WEB EBD/rekomendasi.html" class="header-link-btn" title="Jelajahi Katalog Rekomendasi">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>Katalog</span>
+    </a>
+    <button type="button" class="header-link-btn" id="themeBtn" title="Ubah Tema (Gelap/Terang)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    </button>
+  </div>
+</header>
+
 <div class="app">
   <!-- Area Panggung 3D -->
   <div id="stage">
@@ -192,57 +461,20 @@ button.on{{background:var(--brand);color:var(--onbrand);border-color:var(--brand
 
   <!-- Sidebar Kontrol -->
   <aside>
-    <h1>Gunakan 3D <span class="badge-prem">AVATAR 3D</span></h1>
-    <p class="sub">Visualisasi fitting pakaian realistis pada karakter avatar 3D yang dapat dikustomisasi (rambut, kulit, wajah, sepatu) sesuai gaya dan postur tubuh Anda.</p>
+    <h1>Fitur Premium <span class="badge-prem">MODEL MANUSIA 3D</span></h1>
+    <p class="sub">Visualisasi fitting pakaian 3D realistis langsung pada model tubuh manusia asli (Pria & Wanita). Pakaian menyatu presisi mengikuti anatomi tubuh dan ukuran yang dipilih.</p>
 
-    <!-- Kustomisasi Karakter Game (Avatar 3D) -->
+    <!-- Model Manusia 3D Asli -->
     <fieldset>
-      <legend>Karakter Avatar 3D (Game Customizer)</legend>
+      <legend>Model Manusia 3D</legend>
       <div class="row"><label>Tipe Karakter</label>
         <div class="seg-control" id="charGender" style="grid-column:span 2">
-          <button type="button" class="on" data-val="male">Pria (Atletis)</button>
-          <button type="button" data-val="female">Wanita (Slender)</button>
+          <button type="button" class="on" data-val="male">Pria (Reguler)</button>
+          <button type="button" data-val="female">Wanita (Reguler)</button>
         </div>
       </div>
       <div class="row"><label>Warna Kulit</label>
         <div class="color-picker-row" id="skinTonePicker" style="grid-column:span 2"></div>
-      </div>
-      <div class="row"><label>Gaya Rambut</label>
-        <div style="grid-column:span 2">
-          <select id="hairStyleSelect" style="width:100%;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font-weight:600;cursor:pointer">
-            <option value="undercut" selected>Modern Undercut Fade</option>
-            <option value="curtain">K-Pop Curtain Part</option>
-            <option value="crop">Messy Streetwear Crop</option>
-            <option value="wavy">Wavy Flow / Panjang</option>
-            <option value="buzz">Military Buzz Cut</option>
-            <option value="bald">Botak / Shaved</option>
-          </select>
-        </div>
-      </div>
-      <div class="row"><label>Warna Rambut</label>
-        <div class="color-picker-row" id="hairColorPicker" style="grid-column:span 2"></div>
-      </div>
-      <div class="row"><label>Kumis / Jenggot</label>
-        <div class="seg-control" id="charBeard" style="grid-column:span 2">
-          <button type="button" class="on" data-val="stubble">Stubble</button>
-          <button type="button" data-val="clean">Bersih</button>
-          <button type="button" data-val="goatee">Goatee</button>
-          <button type="button" data-val="full">Jenggot</button>
-        </div>
-      </div>
-      <div class="row"><label>Kacamata</label>
-        <div class="seg-control" id="charGlasses" style="grid-column:span 2">
-          <button type="button" class="on" data-val="none">Tanpa</button>
-          <button type="button" data-val="wayfarer">Wayfarer</button>
-          <button type="button" data-val="round">Metal Bulat</button>
-        </div>
-      </div>
-      <div class="row"><label>Sepatu</label>
-        <div class="seg-control" id="charShoes" style="grid-column:span 2">
-          <button type="button" class="on" data-val="sneakers">Sneakers Putih</button>
-          <button type="button" data-val="boots">Chelsea Boots</button>
-          <button type="button" data-val="loafers">Loafers</button>
-        </div>
       </div>
     </fieldset>
 
@@ -275,10 +507,10 @@ button.on{{background:var(--brand);color:var(--onbrand);border-color:var(--brand
     <fieldset>
       <legend>Ukuran Tubuh Pengguna</legend>
       <div class="row"><label for="H">Tinggi</label><input id="H" type="range" min="0" max="220" value="170"><output></output></div>
-      <div class="row"><label for="W">Berat</label><input id="W" type="range" min="0" max="160" value="65"><output></output></div>
-      <div class="row"><label for="C">Lingkar dada</label><input id="C" type="range" min="0" max="160" value="92"><output></output></div>
-      <div class="row"><label for="P">Lingkar pinggang</label><input id="P" type="range" min="0" max="150" value="76"><output></output></div>
-      <div class="row"><label for="B">Lebar bahu</label><input id="B" type="range" min="0" max="65" value="42"><output></output></div>
+      <div class="row"><label for="W">Berat</label><input id="W" type="range" min="0" max="160" value="64"><output></output></div>
+      <div class="row"><label for="C">Lingkar dada</label><input id="C" type="range" min="0" max="160" value="90"><output></output></div>
+      <div class="row"><label for="P">Lingkar pinggang</label><input id="P" type="range" min="0" max="150" value="78"><output></output></div>
+      <div class="row"><label for="B">Lebar bahu</label><input id="B" type="range" min="0" max="65" value="43"><output></output></div>
       <div style="margin:8px 0 6px 0;display:flex;align-items:center;gap:7px">
         <input type="checkbox" id="autoSyncBody" checked style="cursor:pointer;accent-color:var(--brand)">
         <label for="autoSyncBody" style="font-size:11.5px;color:var(--mut);cursor:pointer;user-select:none">Sesuaikan LD, LP, & Bahu otomatis dari TB & BB</label>
@@ -351,6 +583,22 @@ button.on{{background:var(--brand);color:var(--onbrand);border-color:var(--brand
       </div>
     </fieldset>
 
+    <!-- Koleksi Akun Anda -->
+    <fieldset style="border-color: rgba(109,0,26,0.25); background: rgba(109,0,26,0.02)">
+      <legend style="color: var(--brand)">Koleksi Akun Anda</legend>
+      <p style="font-size: 11.5px; color: var(--mut); margin: 0 0 8px; line-height: 1.4;">
+        Paduan outfit ini pas untuk Anda? Simpan langsung ke daftar outfit akun Anda atau jelajahi katalog.
+      </p>
+      <button id="btnSaveCombo" type="button" class="btn-action" style="width: 100%; background: var(--brand); color: #fff; border: 0; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 12px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        <span>Simpan Kombinasi ke Akun Saya</span>
+      </button>
+      <div style="display: flex; gap: 6px; margin-top: 6px;">
+        <a href="../WEB EBD/account.html#section-koleksi-saya" class="btn-action" style="flex: 1; text-align: center; text-decoration: none; border: 1px solid var(--line); font-size: 11px; padding: 6px; background: var(--panel); color: var(--ink)">Lihat Koleksi</a>
+        <a href="../WEB EBD/rekomendasi.html" class="btn-action" style="flex: 1; text-align: center; text-decoration: none; border: 1px solid var(--line); font-size: 11px; padding: 6px; background: var(--panel); color: var(--ink)">Cari Rekomendasi</a>
+      </div>
+    </fieldset>
+
     <!-- Kontrol Kamera -->
     <div class="line">
       <button id="spin" type="button" class="btn-action">Putar 360°</button>
@@ -360,14 +608,16 @@ button.on{{background:var(--brand);color:var(--onbrand);border-color:var(--brand
   </aside>
 </div>
 
-<!-- Three.js CDN -->
+<!-- Three.js CDN & GLTF Loader -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 
-<!-- Embedded Inline Catalogs (100% Bebas CORS & Self-Contained) -->
+<!-- Embedded Inline Catalogs & HumanModels GLB (100% Bebas CORS & Self-Contained) -->
 <script>
 window.PRODUCT_CATALOG = {json.dumps(catalog, ensure_ascii=False)};
 window.FABRIC_NORMALS = {json.dumps(normals, ensure_ascii=False)};
+window.HUMAN_MODELS_GLB_B64 = "{glb_b64}";
 </script>
 
 <script>
@@ -384,11 +634,12 @@ const catalog = window.PRODUCT_CATALOG;
 const normals = window.FABRIC_NORMALS;
 
 const state = {{
-  H: 170, W: 65, C: 92, P: 76, B: 42,
+  H: 170, W: 64, C: 90, P: 78, B: 43,
   top: 0, bot: 0,
-  topSize: "M", botSize: "L",
+  topSize: "L", botSize: "M",
   topOn: true, botOn: true,
   gender: "male",
+  mannequinMode: "glb",
   skinTone: "warm",
   hairStyle: "undercut",
   hairColor: "black",
@@ -440,40 +691,40 @@ keyLight.shadow.camera.near = 0.5;
 keyLight.shadow.camera.far = 8;
 scene.add(keyLight);
 
-const fillLight = new THREE.DirectionalLight(0xd4e4ff, 1.15);
+const fillLight = new THREE.DirectionalLight(0xfff2e6, 1.2);
 fillLight.position.set(-3.2, 2.0, 3.0);
 scene.add(fillLight);
 
-const rimLight = new THREE.DirectionalLight(0xffffff, 2.2);
+const rimLight = new THREE.DirectionalLight(0xfff5ee, 0.95);
 rimLight.position.set(0, 3.2, -3.2);
 scene.add(rimLight);
 
-const kickerLight = new THREE.DirectionalLight(0xffeedd, 1.0);
+const kickerLight = new THREE.DirectionalLight(0xffeedd, 0.55);
 kickerLight.position.set(2.4, 1.0, -2.4);
 scene.add(kickerLight);
 
-const kickerLeft = new THREE.DirectionalLight(0xddeeff, 1.0);
+const kickerLeft = new THREE.DirectionalLight(0xf5e8df, 0.55);
 kickerLeft.position.set(-2.4, 1.0, -2.4);
 scene.add(kickerLeft);
 
-const hemiLight = new THREE.HemisphereLight(0xffffff, 0xc0c8d6, 0.95);
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0xe8dcd0, 0.85);
 hemiLight.position.set(0, 4, 0);
 scene.add(hemiLight);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
 scene.add(ambientLight);
 
 function setLightingPreset(preset){{
   state.light = preset;
   if(preset === 'softbox'){{
-    keyLight.intensity = 2.2; fillLight.intensity = 1.15; rimLight.intensity = 2.0; kickerLight.intensity = 1.0; kickerLeft.intensity = 1.0;
-    hemiLight.intensity = 0.95; ambientLight.intensity = 0.45;
+    keyLight.intensity = 2.2; fillLight.intensity = 1.2; rimLight.intensity = 0.95; kickerLight.intensity = 0.55; kickerLeft.intensity = 0.55;
+    hemiLight.intensity = 0.85; ambientLight.intensity = 0.35;
   }} else if(preset === 'editorial'){{
-    keyLight.intensity = 1.6; fillLight.intensity = 0.7; rimLight.intensity = 3.4; kickerLight.intensity = 1.8; kickerLeft.intensity = 1.8;
+    keyLight.intensity = 1.8; fillLight.intensity = 0.8; rimLight.intensity = 1.4; kickerLight.intensity = 0.85; kickerLeft.intensity = 0.85;
     hemiLight.intensity = 0.6; ambientLight.intensity = 0.25;
   }} else if(preset === 'bright'){{
-    keyLight.intensity = 2.8; fillLight.intensity = 1.6; rimLight.intensity = 1.4; kickerLight.intensity = 0.7; kickerLeft.intensity = 0.7;
-    hemiLight.intensity = 1.2; ambientLight.intensity = 0.65;
+    keyLight.intensity = 2.6; fillLight.intensity = 1.4; rimLight.intensity = 0.75; kickerLight.intensity = 0.45; kickerLeft.intensity = 0.45;
+    hemiLight.intensity = 1.0; ambientLight.intensity = 0.45;
   }}
   renderer.render(scene, camera);
 }}
@@ -526,9 +777,187 @@ scene.add(world);
 const mannequinGroup = new THREE.Group();
 const topGroup = new THREE.Group();
 const botGroup = new THREE.Group();
+const glbHumanGroup = new THREE.Group();
 world.add(mannequinGroup);
 world.add(topGroup);
 world.add(botGroup);
+world.add(glbHumanGroup);
+
+/* ---------- Model 3D Asli Manekin (HumanModels.glb) ---------- */
+let glbLoaded = false;
+let glbManModel = null;
+let glbWomanModel = null;
+const GLB_MAN_HEIGHT = 3.4893;
+const GLB_WOMAN_HEIGHT = 3.2974;
+
+// Ukuran referensi standar anatomis model 3D asli (HumanModels.glb)
+const GLB_REF_MAN = {{ H: 170, W: 64, C: 90, P: 78, B: 43 }};
+const GLB_REF_WOMAN = {{ H: 160, W: 52, C: 84, P: 66, B: 39 }};
+
+function updateGLBModel(){{
+  if(!glbLoaded) return;
+  const isFemale = state.gender === 'female';
+  const isGlb = state.mannequinMode === 'glb';
+  const ref = isFemale ? GLB_REF_WOMAN : GLB_REF_MAN;
+  const glbH = isFemale ? GLB_WOMAN_HEIGHT : GLB_MAN_HEIGHT;
+
+  // Rasio skala tinggi dari slider Tinggi (H)
+  const scY = state.H / glbH;
+  const scaleH = state.H / ref.H;
+
+  // Rasio skala lebar (X) dan kedalaman (Z) responsif terhadap slider B, C, P, W
+  const ratioWidth = Math.max(0.72, Math.min(1.40, (state.B / ref.B) * 0.40 + (state.C / ref.C) * 0.35 + (state.P / ref.P) * 0.25));
+  const ratioDepth = Math.max(0.72, Math.min(1.40, (state.C / ref.C) * 0.45 + (state.P / ref.P) * 0.45 + (state.W / ref.W) * 0.10));
+
+  const scX = scY * ratioWidth;
+  const scZ = scY * ratioDepth;
+  const scaleZ = scaleH * ratioDepth;
+
+  if(glbManModel){{
+    glbManModel.visible = !isFemale && isGlb;
+    glbManModel.scale.set(scX, scY, scZ);
+    glbManModel.position.set(0, 0, -2.20 * scaleZ);
+  }}
+  if(glbWomanModel){{
+    glbWomanModel.visible = isFemale && isGlb;
+    glbWomanModel.scale.set(scX, scY, scZ);
+    glbWomanModel.position.set(0, 0, -2.60 * scaleZ);
+  }}
+  glbHumanGroup.visible = isGlb;
+}}
+
+function initGLBHumanModels(){{
+  const gltfLoader = new THREE.GLTFLoader();
+
+  function onGltfParsed(gltf){{
+    // Cari model HighPoly atau NonRig dari scene GLB (Three.js sanitasi spasi menjadi underscore)
+    glbManModel = gltf.scene.getObjectByName("Man_(HighPoly)") || 
+                  gltf.scene.getObjectByName("Man (HighPoly)") || 
+                  gltf.scene.getObjectByName("Man_(NonRig)") || 
+                  gltf.scene.getObjectByName("Man (NonRig)");
+
+    glbWomanModel = gltf.scene.getObjectByName("Woman_(HighPoly)") || 
+                    gltf.scene.getObjectByName("Woman (HighPoly)") || 
+                    gltf.scene.getObjectByName("Woman_(NonRig)") || 
+                    gltf.scene.getObjectByName("Woman (NonRig)");
+
+    if(!glbManModel){{
+      gltf.scene.traverse(c => {{
+        if(!glbManModel && c.name && c.name.toLowerCase().includes('man') && !c.name.toLowerCase().includes('woman') && !c.name.toLowerCase().includes('rig')){{
+          glbManModel = c;
+        }}
+      }});
+    }}
+    if(!glbWomanModel){{
+      gltf.scene.traverse(c => {{
+        if(!glbWomanModel && c.name && c.name.toLowerCase().includes('woman') && !c.name.toLowerCase().includes('rig')){{
+          glbWomanModel = c;
+        }}
+      }});
+    }}
+
+    console.log("GLB Models:", "Man=", !!glbManModel, "Woman=", !!glbWomanModel);
+
+    function softenMusclesToNaturalPosture(geometry){{
+      if(!geometry || !geometry.attributes || !geometry.attributes.position) return;
+      const pos = geometry.attributes.position;
+      const v = pos.array;
+      const count = pos.count;
+      for(let i = 0; i < count; i++){{
+        const idx = i * 3;
+        const x = v[idx];
+        const y = v[idx + 1];
+        const z = v[idx + 2];
+
+        // 1. Dada / Pectoralis: ratakan tonjolan dada berotot agar menjadi dada pria biasa (tidak membusung tebal)
+        if(y >= 2.35 && y <= 2.80 && z > 0.05 && Math.abs(x) < 0.28){{
+          const yWeight = Math.exp(-Math.pow(y - 2.55, 2) / (2 * 0.14 * 0.14));
+          const zWeight = Math.min(1, Math.max(0, (z - 0.05) / 0.18));
+          v[idx + 2] -= 0.042 * yWeight * zWeight;
+        }}
+
+        // 2. Bahu & Deltoid: lemaskan bahu agar tidak terlalu kekar / bidang
+        if(y >= 2.65 && y <= 2.95 && Math.abs(x) > 0.25){{
+          const shYWeight = Math.exp(-Math.pow(y - 2.82, 2) / (2 * 0.12 * 0.12));
+          v[idx] -= Math.sign(x) * 0.040 * shYWeight;
+        }}
+
+        // 3. Pinggang & Perut: isi lekukan pinggang binaraga agar siluet torso lurus & proporsional alami
+        if(y >= 2.05 && y <= 2.35 && Math.abs(x) < 0.32){{
+          const wYWeight = Math.exp(-Math.pow(y - 2.20, 2) / (2 * 0.12 * 0.12));
+          v[idx] += Math.sign(x) * 0.018 * wYWeight;
+        }}
+
+        // 4. Lengan (Bisep/Trisep): rampingkan tonjolan lengan agar tidak kekar berotot
+        if(y >= 2.15 && y <= 2.70 && Math.abs(x) >= 0.40 && Math.abs(x) <= 0.85){{
+          const armYWeight = Math.exp(-Math.pow(y - 2.45, 2) / (2 * 0.20 * 0.20));
+          const centerX = Math.sign(x) * 0.56;
+          const centerZ = 0.05;
+          const dx = x - centerX;
+          const dz = z - centerZ;
+          v[idx] -= dx * 0.14 * armYWeight;
+          v[idx + 2] -= dz * 0.14 * armYWeight;
+        }}
+      }}
+      pos.needsUpdate = true;
+      geometry.computeVertexNormals();
+    }}
+
+    [glbManModel, glbWomanModel].forEach(model => {{
+      if(!model) return;
+      model.position.set(0, 0, 0);
+      model.rotation.set(0, 0, 0);
+      model.traverse(child => {{
+        if(child.isMesh){{
+          child.castShadow = true;
+          child.receiveShadow = true;
+          if(model === glbManModel){{
+            softenMusclesToNaturalPosture(child.geometry);
+          }}
+          if(typeof charSkinMat !== 'undefined'){{
+            child.material = charSkinMat;
+            child.material.transparent = false;
+            child.material.opacity = 1.0;
+            child.material.depthWrite = true;
+            child.material.depthTest = true;
+            child.material.side = THREE.DoubleSide;
+            child.material.needsUpdate = true;
+          }}
+        }}
+      }});
+      glbHumanGroup.add(model);
+    }});
+
+    glbLoaded = true;
+    updateGLBModel();
+    buildAllGeometries();
+    renderer.render(scene, camera);
+    console.log("HumanModels.glb berhasil dimuat & dihubungkan ke manekin!");
+  }}
+
+  // 1. Prioritas utama: Parse base64 di memori (100% Bebas CORS & Offline)
+  if(window.HUMAN_MODELS_GLB_B64 && window.HUMAN_MODELS_GLB_B64.length > 100){{
+    try {{
+      const binStr = atob(window.HUMAN_MODELS_GLB_B64);
+      const len = binStr.length;
+      const bytes = new Uint8Array(len);
+      for(let i = 0; i < len; i++){{
+        bytes[i] = binStr.charCodeAt(i);
+      }}
+      gltfLoader.parse(bytes.buffer, '', onGltfParsed, function(err){{
+        console.error("Gagal parse GLB binary:", err);
+      }});
+      return;
+    }} catch(e){{
+      console.warn("Gagal decode base64, mencoba fetch...", e);
+    }}
+  }}
+
+  // 2. Fallback: Fetch file langsung jika berjalan via local/remote HTTP server
+  gltfLoader.load('HumanModels.glb', onGltfParsed, undefined, function(err){{
+    console.warn("GLTFLoader fetch gagal (CORS file://), manekin parametrik aktif sebagai cadangan.", err);
+  }});
+}}
 
 /* Smooth Camera Interpolation / Gliding */
 let camAnim = null;
@@ -650,11 +1079,11 @@ Object.keys(normals).forEach(k => {{
 
 // Game Avatar Dictionaries & Materials
 const SKIN_TONES = {{
-  fair: {{ hex: 0xf6dbcf, css: '#f6dbcf', label: 'Cerah (Fair)' }},
-  warm: {{ hex: 0xe6be9d, css: '#e6be9d', label: 'Langsat (Natural)' }},
-  tan: {{ hex: 0xc69275, css: '#c69275', label: 'Sawo Matang (Tan)' }},
-  bronze: {{ hex: 0x925f44, css: '#925f44', label: 'Eksotis (Bronze)' }},
-  espresso: {{ hex: 0x583b2a, css: '#583b2a', label: 'Espresso (Deep)' }}
+  fair: {{ hex: 0xeeb89e, css: '#eeb89e', label: 'Cerah (Fair)' }},
+  warm: {{ hex: 0xd69974, css: '#d69974', label: 'Langsat (Natural)' }},
+  tan: {{ hex: 0xba7d56, css: '#ba7d56', label: 'Sawo Matang (Tan)' }},
+  bronze: {{ hex: 0x8a5439, css: '#8a5439', label: 'Eksotis (Bronze)' }},
+  espresso: {{ hex: 0x523525, css: '#523525', label: 'Espresso (Deep)' }}
 }};
 
 const HAIR_COLORS = {{
@@ -668,32 +1097,49 @@ const HAIR_COLORS = {{
 
 const charSkinMat = new THREE.MeshStandardMaterial({{
   color: (SKIN_TONES[state.skinTone] || SKIN_TONES.warm).hex,
-  roughness: 0.52,
-  metalness: 0.02
+  roughness: 0.68,
+  metalness: 0.02,
+  transparent: false,
+  opacity: 1.0,
+  depthWrite: true,
+  depthTest: true,
+  side: THREE.DoubleSide
 }});
 
 const charHairMat = new THREE.MeshStandardMaterial({{
   color: (HAIR_COLORS[state.hairColor] || HAIR_COLORS.black).hex,
   roughness: 0.44,
-  metalness: 0.08
+  metalness: 0.08,
+  transparent: false,
+  opacity: 1.0,
+  side: THREE.DoubleSide
 }});
 
 const charEyebrowMat = new THREE.MeshStandardMaterial({{
   color: (HAIR_COLORS[state.hairColor] || HAIR_COLORS.black).hex,
   roughness: 0.65,
-  metalness: 0.02
+  metalness: 0.02,
+  transparent: false,
+  opacity: 1.0,
+  side: THREE.DoubleSide
 }});
 
 const charEyeWhiteMat = new THREE.MeshStandardMaterial({{
   color: 0xf7f7fa,
   roughness: 0.15,
-  metalness: 0.0
+  metalness: 0.0,
+  transparent: false,
+  opacity: 1.0,
+  side: THREE.DoubleSide
 }});
 
 const charIrisMat = new THREE.MeshStandardMaterial({{
   color: 0x342217,
   roughness: 0.22,
-  metalness: 0.04
+  metalness: 0.04,
+  transparent: false,
+  opacity: 1.0,
+  side: THREE.DoubleSide
 }});
 
 const charPupilMat = new THREE.MeshBasicMaterial({{
@@ -703,7 +1149,10 @@ const charPupilMat = new THREE.MeshBasicMaterial({{
 const charUnderwearMat = new THREE.MeshStandardMaterial({{
   color: 0x1a1920,
   roughness: 0.82,
-  metalness: 0.02
+  metalness: 0.02,
+  transparent: false,
+  opacity: 1.0,
+  side: THREE.DoubleSide
 }});
 
 function getMannequinMaterial(){{
@@ -713,6 +1162,11 @@ function getMannequinMaterial(){{
 function updateCharacterSkin(){{
   const tone = SKIN_TONES[state.skinTone] || SKIN_TONES.warm;
   charSkinMat.color.setHex(tone.hex);
+  charSkinMat.transparent = false;
+  charSkinMat.opacity = 1.0;
+  charSkinMat.depthWrite = true;
+  charSkinMat.depthTest = true;
+  charSkinMat.side = THREE.DoubleSide;
   charSkinMat.needsUpdate = true;
   buildAllGeometries();
   renderer.render(scene, camera);
@@ -743,7 +1197,7 @@ catalog.tops.forEach((p, idx) => {{
     roughness: 0.76,
     metalness: 0.03,
     polygonOffset: true,
-    polygonOffsetFactor: -1.0,
+    polygonOffsetFactor: -2.0,
     polygonOffsetUnits: -4.0,
     side: THREE.DoubleSide
   }});
@@ -756,7 +1210,7 @@ catalog.tops.forEach((p, idx) => {{
     roughness: 0.76,
     metalness: 0.03,
     polygonOffset: true,
-    polygonOffsetFactor: -1.0,
+    polygonOffsetFactor: -2.0,
     polygonOffsetUnits: -4.0,
     side: THREE.DoubleSide
   }});
@@ -779,7 +1233,7 @@ catalog.bottoms.forEach((p, idx) => {{
     metalness: 0.03,
     polygonOffset: true,
     polygonOffsetFactor: -1.0,
-    polygonOffsetUnits: -4.0,
+    polygonOffsetUnits: -2.0,
     side: THREE.DoubleSide
   }});
 
@@ -792,7 +1246,7 @@ catalog.bottoms.forEach((p, idx) => {{
     metalness: 0.03,
     polygonOffset: true,
     polygonOffsetFactor: -1.0,
-    polygonOffsetUnits: -4.0,
+    polygonOffsetUnits: -2.0,
     side: THREE.DoubleSide
   }});
 
@@ -817,6 +1271,73 @@ function createLatheMesh(pts, mat, sx, sz){{
   m.castShadow = true;
   m.receiveShadow = true;
   return m;
+}}
+
+/* Torso Kaos Anatomis Presisi:
+   - Sisi depan (phi=0, u=0.5) persis di fZ(y) tanpa tonjolan dada berlebih (rata natural seperti manusia normal)
+   - Sisi belakang (phi=PI, u=0.0/1.0) persis di bZ(y)
+   - Sisi samping kiri/kanan (phi=+/-PI/2) persis di xRad(y)
+   - Menghasilkan profil dada alami manusia tanpa efek balon / tonjolan berlebih */
+function createAnatomicalTorsoMesh(specs, mat, scaleX, scaleZ, easeX, easeZ){{
+  const s = specs.slice().sort((a,b) => a[0] - b[0]);
+
+  function interp(y){{
+    if(y <= s[0][0]){{
+      return {{
+        xRad: (s[0][1] * scaleX) + easeX,
+        fZ: (s[0][2] * scaleZ) + easeZ,
+        bZ: (s[0][3] * scaleZ) - easeZ
+      }};
+    }}
+    const last = s[s.length - 1];
+    if(y >= last[0]){{
+      return {{
+        xRad: (last[1] * scaleX) + easeX,
+        fZ: (last[2] * scaleZ) + easeZ,
+        bZ: (last[3] * scaleZ) - easeZ
+      }};
+    }}
+    for(let i = 0; i < s.length - 1; i++){{
+      if(y >= s[i][0] && y <= s[i+1][0]){{
+        const t = (y - s[i][0]) / (s[i+1][0] - s[i][0]);
+        const st = t * t * (3 - 2 * t);
+        const rawX = s[i][1] + (s[i+1][1] - s[i][1]) * st;
+        const rawFZ = s[i][2] + (s[i+1][2] - s[i][2]) * st;
+        const rawBZ = s[i][3] + (s[i+1][3] - s[i][3]) * st;
+        const xRad = (rawX * scaleX) + easeX;
+        const fZ = (rawFZ * scaleZ) + easeZ;
+        const bZ = (rawBZ * scaleZ) - easeZ;
+        return {{ xRad, fZ, bZ }};
+      }}
+    }}
+    return {{ xRad: 15 * scaleX + easeX, fZ: 10 * scaleZ + easeZ, bZ: -10 * scaleZ - easeZ }};
+  }}
+
+  const yPts = [];
+  const yMin = s[0][0], yMax = s[s.length - 1][0];
+  const N_PTS = 80;
+  for(let i = 0; i <= N_PTS; i++){{
+    const yVal = yMin + (yMax - yMin) * (i / N_PTS);
+    yPts.push(new THREE.Vector2(10, yVal));
+  }}
+  const geo = new THREE.LatheGeometry(yPts, 80, -Math.PI, 2 * Math.PI);
+  const pos = geo.attributes.position;
+  for(let i = 0; i < pos.count; i++){{
+    const x0 = pos.getX(i);
+    const y0 = pos.getY(i);
+    const z0 = pos.getZ(i);
+    const phi = Math.atan2(x0, z0);
+    const ip = interp(y0);
+    const zc = (ip.fZ + ip.bZ) * 0.5;
+    const zr = (ip.fZ - ip.bZ) * 0.5;
+    pos.setXYZ(i, Math.sin(phi) * ip.xRad, y0, zc + Math.cos(phi) * zr);
+  }}
+  geo.computeVertexNormals();
+
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return {{ mesh: m, interp }};
 }}
 
 function createCylMesh(rt, rb, y0, y1, x, mat){{
@@ -1244,160 +1765,96 @@ function clearGroup(g){{
   }}
 }}
 
-/* ---------- Full Geometries Builder ---------- */
+/* ---------- Full Geometries Builder (Dedicated 100% to HumanModels.glb) ---------- */
 function buildAllGeometries(){{
   clearGroup(mannequinGroup);
+  mannequinGroup.visible = false;
   clearGroup(topGroup);
   clearGroup(botGroup);
 
+  // Update visibilitas dan skala model manusia 3D asli
+  updateGLBModel();
+
   const {{H, W, C, P, B}} = state;
   const isFemale = state.gender === 'female';
-  SX = isFemale ? 1.10 : 1.18;
-  SZ = isFemale ? 0.88 : 0.82;
+  const ref = isFemale ? GLB_REF_WOMAN : GLB_REF_MAN;
 
-  const safeH = Math.max(0.1, H);
-  const hip = Math.max(C, P + (H > 0 || C > 0 || P > 0 ? (isFemale ? 22 : 18) : 0));
-  const bmi = safeH > 0 ? W / Math.pow(safeH / 100, 2) : 22;
-  const armR = Math.min(6, Math.max(0.1, (isFemale ? 3.6 : 4.2) + (isNaN(bmi) ? 0 : (bmi - 22) * 0.15)));
-  const chestR = rad(C), waistR = rad(P), hipR = rad(hip);
-  const shR = Math.max(0.1, (B / 2 - armR * 0.9) / SX);
-  const neckR = Math.max(0.1, H * (isFemale ? 0.024 : 0.026));
-  const yCr = 0.47 * H, yHip = 0.52 * H, ySh = 0.80 * H, yNk = 0.84 * H;
-  const e = 0.85; // Ketebalan kain pakaian di atas kulit manekin (8.5 mm)
+  // Skala sinkron tinggi, lebar, dan kedalaman tubuh dan pakaian
+  const scaleH = H / ref.H;
+  const ratioWidth = Math.max(0.72, Math.min(1.40, (B / ref.B) * 0.40 + (C / ref.C) * 0.35 + (P / ref.P) * 0.25));
+  const ratioDepth = Math.max(0.72, Math.min(1.40, (C / ref.C) * 0.45 + (P / ref.P) * 0.45 + (W / ref.W) * 0.10));
 
-  const skinMat = getMannequinMaterial();
+  const scaleX = scaleH * ratioWidth;
+  const scaleZ = scaleH * ratioDepth;
+
   const curTopMat = topMaterials[state.top] || topMaterials[0];
   const curBotMat = botMaterials[state.bot] || botMaterials[0];
 
-  // 1. Tubuh Karakter (Torso)
-  const rows = [
-    [0.47, hipR * 0.88, 0],
-    [0.52, hipR, 0.97],
-    [0.56, hipR * 0.93, 0.97],
-    [0.62, waistR, 0.96],
-    [0.67, waistR + (chestR - waistR) * 0.72, 0.98],
-    [0.72, chestR, 1.0],
-    [0.76, chestR * 0.94, 0.93],
-    [0.795, shR * 0.96, 0.4],
-    [0.812, shR, 0],
-    [0.828, shR * 0.52 + neckR * 0.48, 0],
-    [0.838, neckR * 1.15, 0],
-    [0.852, neckR, 0]
-  ];
-  torsoSkinMesh = createLatheMesh(rows.map(r => [r[1], r[0] * H]), skinMat, SX, SZ);
-  mannequinGroup.add(torsoSkinMesh);
-
-  // Celana Dalam / Fitted Compression Briefs
-  underwearMesh = createLatheMesh([
-    [hipR * 0.90 + 0.15, yCr - 0.015 * H],
-    [hipR + 0.15, yHip],
-    [hipR * 0.94 + 0.15, 0.56 * H]
-  ], charUnderwearMat, SX, SZ);
-  mannequinGroup.add(underwearMesh);
-
-  // 2. Kaki & Sepatu Karakter
-  const legTop = hipR * 0.62, ankle = Math.max(2.8, legTop * 0.34), lx = hipR * SX * 0.5;
-  const legPts = add => [
-    [legTop + add, yCr + 0.015 * H],
-    [legTop * 0.93 + add, 0.38 * H],
-    [legTop * 0.64 + add, 0.285 * H],
-    [legTop * 0.68 + add, 0.20 * H],
-    [legTop * 0.45 + add, 0.12 * H],
-    [ankle + add, 0.045 * H],
-    [ankle * 0.95 + add, 0.03 * H]
-  ];
-
-  leftLegSkinMesh = createLatheMesh(legPts(0), skinMat);
-  leftLegSkinMesh.position.x = -lx;
-  mannequinGroup.add(leftLegSkinMesh);
-
-  rightLegSkinMesh = createLatheMesh(legPts(0), skinMat);
-  rightLegSkinMesh.position.x = lx;
-  mannequinGroup.add(rightLegSkinMesh);
-
-  // Sepatu Karakter (Footwear)
-  leftShoeGroup = createCharacterShoe(-1, lx, ankle, H, state);
-  rightShoeGroup = createCharacterShoe(1, lx, ankle, H, state);
-  mannequinGroup.add(leftShoeGroup);
-  mannequinGroup.add(rightShoeGroup);
-
-  // 3. Leher & Kepala Karakter Game
-  neckMesh = createCylMesh(neckR, neckR * 1.05, yNk - 0.01 * H, yNk + 0.045 * H, 0, skinMat);
-  mannequinGroup.add(neckMesh);
-
-  headGroup = new THREE.Group();
-  headGroup.position.set(0, 0.93 * H, 0.005 * H);
-  buildCharacterHead(headGroup, skinMat, charHairMat, charEyebrowMat, state);
-  mannequinGroup.add(headGroup);
-
-  // 4. Lengan & Tangan Karakter Game (Anatomi Jari Rileks)
-  function createArm(side){{
-    const g = new THREE.Group();
-    g.position.set(side * B / 2, ySh, 0);
-    g.rotation.z = side * 0.09;
-
-    const armSkin = createLatheMesh([
-      [armR * 0.98, -0.012 * H], [armR, -0.06 * H], [armR * 0.86, -0.15 * H],
-      [armR * 0.78, -0.18 * H], [armR * 0.8, -0.215 * H], [armR * 0.56, -0.29 * H],
-      [armR * 0.5, -0.31 * H]
-    ], skinMat);
-    g.add(armSkin);
-
-    const shJoint = new THREE.Mesh(new THREE.SphereGeometry(armR, 36, 24), skinMat);
-    shJoint.position.y = -0.012 * H;
-    shJoint.castShadow = true; shJoint.receiveShadow = true;
-    g.add(shJoint);
-
-    const hand = createCharacterHand(side, armR, H, skinMat);
-    g.add(hand);
-
-    return g;
-  }}
-  leftArmSkinGroup = createArm(-1);
-  rightArmSkinGroup = createArm(1);
-  mannequinGroup.add(leftArmSkinGroup);
-  mannequinGroup.add(rightArmSkinGroup);
-
-  // 4. Pakaian Atasan (Top Group)
-  const sizeC = TOP_SIZES[state.topSize], sizeR = rad(sizeC), dTop = sizeC - C;
+  // 1. Pakaian Atasan (Top Group)
+  const sizeC = TOP_SIZES[state.topSize], dTop = sizeC - C;
   const topStatus = fitStatus(dTop, 2, 14);
   document.getElementById('fitTop').textContent = `${{topStatus.label}} (${{dTop > 0 ? '+' : ''}}${{dTop}} cm)`;
   document.getElementById('dotTop').className = `chip-status ${{topStatus.class}}`;
 
-  const gp = rows.slice(1, 10).map(r => [r[2] ? Math.max(r[1] + e, sizeR * r[2]) : r[1] + e + 0.4, r[0] * H]);
-  gp.push([neckR + 1.6, 0.836 * H]);
-  topTorsoMesh = createLatheMesh(gp, curTopMat.torso, SX, SZ);
+  // Safe positive ease baju: selalu berada rapi di luar kulit tubuh
+  const topEaseX = Math.max(0.40, 0.48 + Math.max(0, dTop) * 0.038);
+  const topEaseZ = Math.max(0.40, 0.48 + Math.max(0, dTop) * 0.032);
+
+  // Profil Torso Kaos Presisi Anatomi Model 3D (Rapi dari Depan & Samping, Menutupi Celana Bebas Clipping)
+  const topTorsoSpecs = isFemale ? [
+    [ 0.480 * H, 17.2,   9.6,  -10.0 ], // Hem bawah kaos (Y ~ 76.8cm)
+    [ 0.525 * H, 17.8,  10.2,  -11.2 ], // Panggul bawah (Y ~ 84.0cm)
+    [ 0.565 * H, 17.2,  10.6,  -11.8 ], // Pinggul atas (Y ~ 90.4cm)
+    [ 0.615 * H, 15.5,  11.4,  -10.8 ], // Pinggang ramping (Y ~ 98.4cm)
+    [ 0.665 * H, 15.8,  11.5,   -7.8 ], // Bawah dada (Y ~ 106.4cm)
+    [ 0.720 * H, 22.5,  12.0,  -10.8 ], // Puncak payudara natural (Y ~ 115.2cm)
+    [ 0.760 * H, 23.5,  11.8,  -11.5 ], // Dada atas (Y ~ 121.6cm)
+    [ 0.800 * H, 21.0,   8.4,  -11.8 ], // Bahu atas (Y ~ 128.0cm)
+    [ 0.822 * H, 14.5,   6.0,  -10.5 ], // Pangkal leher (Y ~ 131.5cm)
+    [ 0.832 * H,  8.6,   5.5,   -9.8 ]  // Kerah (Y ~ 133.1cm)
+  ] : [
+    [ 0.485 * H, 18.5,  10.8,  -10.4 ], // Hem bawah kaos (Y ~ 82.5cm)
+    [ 0.510 * H, 18.8,  11.0,  -11.8 ], // Panggul bawah (Y ~ 87.0cm)
+    [ 0.550 * H, 18.0,  11.2,  -11.2 ], // Pinggul atas (Y ~ 93.5cm)
+    [ 0.605 * H, 17.5,  11.2,   -8.8 ], // Pinggang / perut (Y ~ 103cm) - Lurus proporsional alami
+    [ 0.670 * H, 17.8,  10.5,  -10.5 ], // Rusuk bawah (Y ~ 114cm)
+    [ 0.730 * H, 24.5,  10.6,  -12.0 ], // Dada pria biasa natural (Y ~ 124cm) - Tidak membusung
+    [ 0.776 * H, 25.5,   8.6,  -11.6 ], // Dada atas / sambungan bahu (Y ~ 132cm)
+    [ 0.805 * H, 23.8,   6.6,  -11.2 ], // Bahu atas (Y ~ 137cm)
+    [ 0.824 * H, 15.6,   5.8,  -11.0 ], // Pangkal leher (Y ~ 140cm)
+    [ 0.835 * H,  9.5,   5.8,   -9.8 ]  // Lingkar kerah (Y ~ 142cm)
+  ];
+
+  const torsoRes = createAnatomicalTorsoMesh(topTorsoSpecs, curTopMat.torso, scaleX, scaleZ, topEaseX, topEaseZ);
+  topTorsoMesh = torsoRes.mesh;
   topGroup.add(topTorsoMesh);
 
-  topCollarMesh = createTorusRing(neckR + 1.8, 0.55, 0.838 * H, curTopMat.sleeve, SX * 1.02, SZ * 1.02);
-  topGroup.add(topCollarMesh);
+  topCollarMesh = null;
+  topHemMesh = null;
 
-  const hemR = rows[1][1] + e + 0.4;
-  topHemMesh = createTorusRing(hemR, 0.45, rows[1][0] * H, curTopMat.sleeve, SX, SZ);
-  topGroup.add(topHemMesh);
-
-  const sl = Math.max(armR * 1.08 + e, armR + (sizeC - C) * 0.05);
+  // Lengan Kaos Presisi Mengikuti Sudut & Poros Lengan Model 3D
+  const slvX = (isFemale ? 16.2 : 20.0) * scaleX;
+  const slvY = (isFemale ? 0.794 : 0.776) * H;
+  const slvZ = (isFemale ? -2.6 : -2.4) * scaleZ;
+  const slvRotZ = isFemale ? 0.360 : 0.372;
+  const slvLen = (isFemale ? 0.088 : 0.098) * H;
+  const slvRTop = (isFemale ? 4.5 : 5.4) * scaleZ + topEaseZ * 0.35;
+  const slvRBot = (isFemale ? 3.9 : 4.8) * scaleZ + topEaseZ * 0.35;
 
   function createSleeve(side){{
     const g = new THREE.Group();
-    g.position.set(side * B / 2, ySh, 0);
-    g.rotation.z = side * 0.09;
+    g.position.set(side * slvX, slvY, slvZ);
+    g.rotation.z = side * slvRotZ;
 
-    const tube = new THREE.Mesh(new THREE.CylinderGeometry(sl, sl * 0.93, Math.max(0.001, 0.138 * H), 64, 1, true), curTopMat.sleeve);
-    tube.position.y = -0.081 * H;
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(slvRTop, slvRBot, slvLen, 48, 1, false), curTopMat.sleeve);
+    tube.position.y = -slvLen * 0.5;
     tube.castShadow = true; tube.receiveShadow = true;
     g.add(tube);
 
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(sl, 36, 24), curTopMat.sleeve);
-    cap.position.y = -0.012 * H;
-    cap.scale.y = 0.9;
-    cap.castShadow = true; cap.receiveShadow = true;
-    g.add(cap);
-
-    const cuff = createTorusRing(sl * 0.93, 0.45, -0.15 * H, curTopMat.sleeve);
+    const cuff = createTorusRing(slvRBot, 0.35 * scaleX, -slvLen, curTopMat.sleeve);
     g.add(cuff);
 
-    return {{group: g, tube, cap, cuff}};
+    return {{group: g, tube, cap: null, cuff}};
   }}
 
   const lSl = createSleeve(-1);
@@ -1410,43 +1867,83 @@ function buildAllGeometries(){{
 
   topGroup.visible = state.topOn;
 
-  // 5. Pakaian Celana (Bot Group)
+  // 2. Pakaian Celana (Bot Group)
   const sizeP = BOT_SIZES[state.botSize], dBot = sizeP - P;
   const botStatus = fitStatus(dBot, 1, 12);
   document.getElementById('fitBot').textContent = `${{botStatus.label}} (${{dBot > 0 ? '+' : ''}}${{dBot}} cm)`;
   document.getElementById('dotBot').className = `chip-status ${{botStatus.class}}`;
 
-  const loose = Math.max(0, sizeP - P) * 0.035;
-  const wR = Math.max(waistR + e, rad(sizeP));
+  // Safe positive ease celana: pas rapi di bawah baju, topEase > botEase mencegah ban celana tembus ke baju
+  const botEaseX = Math.max(0.20, 0.26 + Math.max(0, dBot) * 0.022);
+  const botEaseZ = Math.max(0.20, 0.26 + Math.max(0, dBot) * 0.020);
 
-  // Points go from bottom (crotch yCr) to top (waist 0.64*H) so UV v goes smoothly from bottom to top
-  botWaistMesh = createLatheMesh([
-    [hipR * 0.9 + e, yCr],
-    [Math.max(hipR + e, wR * 1.04), yHip],
-    [Math.max(hipR * 0.93 + e, (wR + hipR) / 2), 0.56 * H],
-    [wR, 0.64 * H]
-  ], curBotMat.waist, SX, SZ);
+  // Pinggang & Panggul Celana Presisi Anatomis (Pas Sempurna di Bawah Baju Tanpa Menembus Samping)
+  const botWaistSpecs = isFemale ? [
+    [ 0.485 * H, 16.0,  9.0,  -8.5 ], // Selangkangan (Y ~ 77.6cm)
+    [ 0.525 * H, 16.5,  9.5, -10.0 ], // Panggul bawah (Y ~ 84cm)
+    [ 0.565 * H, 16.0,  9.8, -10.6 ], // Pinggul atas (Y ~ 90.4cm)
+    [ 0.600 * H, 14.2, 10.4,  -9.2 ]  // Ban pinggang (Y ~ 96cm)
+  ] : [
+    [ 0.476 * H, 17.0,  9.2,  -8.2 ], // Selangkangan (Y ~ 81cm)
+    [ 0.510 * H, 17.2,  9.6, -10.8 ], // Panggul bawah / bokong (Y ~ 86.7cm)
+    [ 0.545 * H, 16.6, 10.4, -10.4 ], // Pinggul atas (Y ~ 92.7cm)
+    [ 0.580 * H, 15.6, 10.8,  -9.0 ]  // Ban pinggang (Y ~ 98.6cm)
+  ];
+
+  const waistRes = createAnatomicalTorsoMesh(botWaistSpecs, curBotMat.waist, scaleX, scaleZ, botEaseX, botEaseZ);
+  botWaistMesh = waistRes.mesh;
   botGroup.add(botWaistMesh);
 
-  botWaistRimMesh = createTorusRing(wR + 0.4, 0.5, 0.64 * H, curBotMat.waist, SX, SZ);
-  botGroup.add(botWaistRimMesh);
+  botWaistRimMesh = null;
 
-  botLeftLegMesh = createLatheMesh(legPts(e + loose).slice(0, 6), curBotMat.leg);
-  botLeftLegMesh.position.x = -lx;
-  botGroup.add(botLeftLegMesh);
+  // Kaki Celana Slim/Regular Fit Pas Rapi (Tidak Terlalu Longgar / Baggy & Bebas Tembus Kulit)
+  const hipX = (isFemale ? 10.6 : 10.3) * scaleX;
+  const hipY = (isFemale ? 0.485 : 0.476) * H;
+  const hipZ = (isFemale ? -1.4 : -0.7) * scaleZ;
+  const legRotZ = isFemale ? 0.076 : 0.097;
+  const legRotX = isFemale ? 0.005 : 0.004;
+  const legLen = (isFemale ? 0.425 : 0.418) * H;
 
-  botRightLegMesh = createLatheMesh(legPts(e + loose).slice(0, 6), curBotMat.leg);
-  botRightLegMesh.position.x = lx;
-  botGroup.add(botRightLegMesh);
+  const legPts = isFemale ? [
+    [ 4.8 + botEaseX * 0.22, -legLen ],          // Ujung pergelangan kaki (Y ~ 10cm)
+    [ 5.6 + botEaseX * 0.25, -legLen * 0.78 ],   // Betis bawah (Y ~ 25cm)
+    [ 6.8 + botEaseX * 0.28, -legLen * 0.55 ],   // Puncak betis / lutut (Y ~ 40cm)
+    [ 7.2 + botEaseX * 0.30, -legLen * 0.38 ],   // Paha bawah (Y ~ 52cm)
+    [ 8.0 + botEaseX * 0.35, -legLen * 0.18 ],   // Paha tengah (Y ~ 65cm)
+    [ 8.6 + botEaseX * 0.38, 0 ]                 // Selangkangan / paha atas (Y ~ 78cm)
+  ] : [
+    [ 4.8 + botEaseX * 0.22, -legLen ],          // Ujung pergelangan kaki (Y ~ 10cm)
+    [ 6.1 + botEaseX * 0.25, -legLen * 0.77 ],   // Betis bawah (Y ~ 26cm)
+    [ 7.5 + botEaseX * 0.28, -legLen * 0.55 ],   // Puncak betis / lutut (Y ~ 42cm)
+    [ 7.9 + botEaseX * 0.30, -legLen * 0.38 ],   // Paha bawah (Y ~ 54cm)
+    [ 8.8 + botEaseX * 0.35, -legLen * 0.18 ],   // Paha tengah (Y ~ 68cm)
+    [ 9.4 + botEaseX * 0.38, 0 ]                 // Selangkangan / paha atas (Y ~ 81cm)
+  ];
 
-  const cuffR = ankle + e + loose;
-  botLeftCuffMesh = createTorusRing(cuffR + 0.3, 0.45, 0.045 * H, curBotMat.leg);
-  botLeftCuffMesh.position.x = -lx;
-  botGroup.add(botLeftCuffMesh);
+  function createPantLeg(side){{
+    const g = new THREE.Group();
+    g.position.set(side * hipX, hipY, hipZ);
+    g.rotation.z = side * legRotZ;
+    g.rotation.x = legRotX;
 
-  botRightCuffMesh = createTorusRing(cuffR + 0.3, 0.45, 0.045 * H, curBotMat.leg);
-  botRightCuffMesh.position.x = lx;
-  botGroup.add(botRightCuffMesh);
+    const legMesh = createLatheMesh(legPts, curBotMat.leg, scaleX, scaleZ * 1.12);
+    g.add(legMesh);
+
+    const cuffMesh = createTorusRing((legPts[0][0] + 0.05) * scaleX, 0.28 * scaleX, -legLen, curBotMat.leg, 1.0, (scaleZ * 1.12) / scaleX);
+    g.add(cuffMesh);
+
+    return {{group: g, legMesh, cuffMesh}};
+  }}
+
+  const lLeg = createPantLeg(-1);
+  botLeftLegMesh = lLeg.legMesh;
+  botLeftCuffMesh = lLeg.cuffMesh;
+  botGroup.add(lLeg.group);
+
+  const rLeg = createPantLeg(1);
+  botRightLegMesh = rLeg.legMesh;
+  botRightCuffMesh = rLeg.cuffMesh;
+  botGroup.add(rLeg.group);
 
   botGroup.visible = state.botOn;
 }}
@@ -1564,16 +2061,28 @@ function syncOut(id){{
   el.nextElementSibling.textContent = el.value + unit[id];
 }}
 
-function calcEstimatedBody(hVal, wVal){{
+function calcEstimatedBody(hVal, wVal, gender = state.gender){{
   if(hVal <= 0 || wVal <= 0){{
     return {{C: 0, P: 0, B: 0}};
   }}
-  const idealW = 22 * Math.pow(hVal / 100, 2);
-  const deltaW = wVal - idealW;
-  const C = Math.max(0, Math.round(hVal * 0.535 + deltaW * 0.75));
-  const P = Math.max(0, Math.round(hVal * 0.44 + deltaW * 0.85));
-  const B = Math.max(0, Math.round(hVal * 0.246 + deltaW * 0.08));
-  return {{C, P, B}};
+  const isFemale = gender === 'female';
+  if(isFemale){{
+    // Anatomi Model Wanita 3D (Ref: H=160cm, W=52kg -> C=84, P=66, B=39)
+    const baseW = 20.3125 * Math.pow(hVal / 100, 2);
+    const dW = wVal - baseW;
+    const C = Math.max(60, Math.round(hVal * 0.5250 + dW * 0.60));
+    const P = Math.max(50, Math.round(hVal * 0.4125 + dW * 0.70));
+    const B = Math.max(30, Math.round(hVal * 0.2438 + dW * 0.05));
+    return {{C, P, B}};
+  }} else {{
+    // Anatomi Model Pria 3D Proporsional / Reguler (Ref: H=170cm, W=64kg -> C=90, P=78, B=43)
+    const baseW = 22.1453 * Math.pow(hVal / 100, 2);
+    const dW = wVal - baseW;
+    const C = Math.max(70, Math.round(hVal * 0.5294 + dW * 0.60));
+    const P = Math.max(55, Math.round(hVal * 0.4588 + dW * 0.70));
+    const B = Math.max(34, Math.round(hVal * 0.2529 + dW * 0.05));
+    return {{C, P, B}};
+  }}
 }}
 
 function setSlider(id, v){{
@@ -1759,6 +2268,17 @@ if(hairBox){{
   }});
 }}
 
+// Mannequin Model: GLB vs Parametrik
+document.querySelectorAll('#mannequinMode button').forEach(btn => {{
+  btn.addEventListener('click', () => {{
+    document.querySelectorAll('#mannequinMode button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    state.mannequinMode = btn.dataset.val;
+    buildAllGeometries();
+    renderer.render(scene, camera);
+  }});
+}});
+
 // Character Avatar: Gender
 document.querySelectorAll('#charGender button').forEach(btn => {{
   btn.addEventListener('click', () => {{
@@ -1771,6 +2291,30 @@ document.querySelectorAll('#charGender button').forEach(btn => {{
       document.querySelectorAll('#charBeard button').forEach(b => b.classList.toggle('on', b.dataset.val === 'clean'));
       const hs = document.getElementById('hairStyleSelect');
       if(hs) hs.value = state.hairStyle;
+      // Sinkronisasi data tubuh otomatis ke proporsi model wanita 3D asli
+      setSlider('H', GLB_REF_WOMAN.H);
+      setSlider('W', GLB_REF_WOMAN.W);
+      setSlider('C', GLB_REF_WOMAN.C);
+      setSlider('P', GLB_REF_WOMAN.P);
+      setSlider('B', GLB_REF_WOMAN.B);
+      state.topSize = 'M';
+      state.botSize = 'S';
+      document.querySelectorAll('#topSize button').forEach(b => b.classList.toggle('on', b.dataset.val === 'M'));
+      document.querySelectorAll('#botSize button').forEach(b => b.classList.toggle('on', b.dataset.val === 'S'));
+    }} else {{
+      if(state.hairStyle === 'curtain') state.hairStyle = 'undercut';
+      const hs = document.getElementById('hairStyleSelect');
+      if(hs) hs.value = state.hairStyle;
+      // Sinkronisasi data tubuh otomatis ke proporsi model pria 3D asli
+      setSlider('H', GLB_REF_MAN.H);
+      setSlider('W', GLB_REF_MAN.W);
+      setSlider('C', GLB_REF_MAN.C);
+      setSlider('P', GLB_REF_MAN.P);
+      setSlider('B', GLB_REF_MAN.B);
+      state.topSize = 'L';
+      state.botSize = 'M';
+      document.querySelectorAll('#topSize button').forEach(b => b.classList.toggle('on', b.dataset.val === 'L'));
+      document.querySelectorAll('#botSize button').forEach(b => b.classList.toggle('on', b.dataset.val === 'M'));
     }}
     buildAllGeometries();
     renderer.render(scene, camera);
@@ -1905,81 +2449,82 @@ customFileInput.addEventListener('change', e => {{
   }}
 }});
 
-function processUploadedFile(file, category){{
-  const reader = new FileReader();
-  reader.onload = function(evt){{
-    const img = new Image();
-    img.onload = function(){{
-      // 1. Offscreen analysis untuk segmentasi background & pencarian titik tengah
-      const tempC = document.createElement('canvas');
-      const w = img.naturalWidth || img.width;
-      const h = img.naturalHeight || img.height;
-      tempC.width = w;
-      tempC.height = h;
-      const tCtx = tempC.getContext('2d');
-      tCtx.drawImage(img, 0, 0);
-      const imgData = tCtx.getImageData(0, 0, w, h);
-      const d = imgData.data;
+function applyGarmentImage(img, prodName, category){{
+  // 1. Offscreen analysis untuk segmentasi background & pencarian titik tengah
+  const tempC = document.createElement('canvas');
+  const w = img.naturalWidth || img.width;
+  const h = img.naturalHeight || img.height;
+  tempC.width = w;
+  tempC.height = h;
+  const tCtx = tempC.getContext('2d');
+  tCtx.drawImage(img, 0, 0);
 
-      // Sample warna background dari 4 pojok
-      const sample = (x, y) => {{
+  let d = null;
+  let bgR = 250, bgG = 250, bgB = 250;
+  let minX = 0, maxX = w, minY = 0, maxY = h;
+  let fabricR = 240, fabricG = 240, fabricB = 240, fabricCount = 0;
+
+  try {{
+    const imgData = tCtx.getImageData(0, 0, w, h);
+    d = imgData.data;
+    const sample = (x, y) => {{
+      const i = (y * w + x) * 4;
+      return [d[i], d[i+1], d[i+2]];
+    }};
+    const c = [sample(4,4), sample(w-5,4), sample(4,h-5), sample(w-5,h-5)];
+    bgR = (c[0][0]+c[1][0]+c[2][0]+c[3][0])/4;
+    bgG = (c[0][1]+c[1][1]+c[2][1]+c[3][1])/4;
+    bgB = (c[0][2]+c[1][2]+c[2][2]+c[3][2])/4;
+
+    minX = w; maxX = 0; minY = h; maxY = 0;
+    for(let y = 0; y < h; y += 4){{
+      for(let x = 0; x < w; x += 4){{
         const i = (y * w + x) * 4;
-        return [d[i], d[i+1], d[i+2]];
-      }};
-      const c = [sample(4,4), sample(w-5,4), sample(4,h-5), sample(w-5,h-5)];
-      const bgR = (c[0][0]+c[1][0]+c[2][0]+c[3][0])/4;
-      const bgG = (c[0][1]+c[1][1]+c[2][1]+c[3][1])/4;
-      const bgB = (c[0][2]+c[1][2]+c[2][2]+c[3][2])/4;
-
-      // Temukan bounding box pakaian
-      let minX = w, maxX = 0, minY = h, maxY = 0;
-      let fabricR = 0, fabricG = 0, fabricB = 0, fabricCount = 0;
-      for(let y = 0; y < h; y += 4){{
-        for(let x = 0; x < w; x += 4){{
-          const i = (y * w + x) * 4;
-          const dist = Math.max(Math.abs(d[i]-bgR), Math.abs(d[i+1]-bgG), Math.abs(d[i+2]-bgB));
-          if(dist > 22){{
-            if(x < minX) minX = x;
-            if(x > maxX) maxX = x;
-            if(y < minY) minY = y;
-            if(y > maxY) maxY = y;
-            if(y > h * 0.35 && y < h * 0.65 && x > w * 0.35 && x < w * 0.65){{
-              fabricR += d[i]; fabricG += d[i+1]; fabricB += d[i+2];
-              fabricCount++;
-            }}
+        const dist = Math.max(Math.abs(d[i]-bgR), Math.abs(d[i+1]-bgG), Math.abs(d[i+2]-bgB));
+        if(dist > 22){{
+          if(x < minX) minX = x;
+          if(x > maxX) maxX = x;
+          if(y < minY) minY = y;
+          if(y > maxY) maxY = y;
+          if(y > h * 0.35 && y < h * 0.65 && x > w * 0.35 && x < w * 0.65){{
+            fabricR += d[i]; fabricG += d[i+1]; fabricB += d[i+2];
+            fabricCount++;
           }}
         }}
       }}
+    }}
+  }} catch(corsErr) {{
+    console.warn("CORS/Canvas fallback mode active:", corsErr);
+  }}
 
-      if(fabricCount > 0){{
-        fabricR = Math.round(fabricR / fabricCount);
-        fabricG = Math.round(fabricG / fabricCount);
-        fabricB = Math.round(fabricB / fabricCount);
-      }} else {{
-        fabricR = 245; fabricG = 245; fabricB = 245;
-      }}
+  if(fabricCount > 0){{
+    fabricR = Math.round(fabricR / fabricCount);
+    fabricG = Math.round(fabricG / fabricCount);
+    fabricB = Math.round(fabricB / fabricCount);
+  }} else {{
+    fabricR = 245; fabricG = 245; fabricB = 245;
+  }}
 
-      // 2. Buat kanvas tekstur torso/waist 512x512
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d');
+  // 2. Buat kanvas tekstur torso/waist 512x512
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
 
-      // Warna dasar kain bersih tanpa garis batas
-      ctx.fillStyle = `rgb(${{fabricR}}, ${{fabricG}}, ${{fabricB}})`;
-      ctx.fillRect(0, 0, 512, 512);
+  ctx.fillStyle = `rgb(${{fabricR}}, ${{fabricG}}, ${{fabricB}})`;
+  ctx.fillRect(0, 0, 512, 512);
 
-      // Potong bagian baju dan buang background putih
-      const gw = Math.max(10, maxX - minX);
-      const gh = Math.max(10, maxY - minY);
-      const fgC = document.createElement('canvas');
-      fgC.width = gw;
-      fgC.height = gh;
-      const fgCtx = fgC.getContext('2d');
+  const gw = Math.max(10, maxX - minX);
+  const gh = Math.max(10, maxY - minY);
+  const fgC = document.createElement('canvas');
+  fgC.width = gw;
+  fgC.height = gh;
+  const fgCtx = fgC.getContext('2d');
+
+  try {{
+    if(d) {{
       const fgData = tCtx.getImageData(minX, minY, gw, gh);
       const fgD = fgData.data;
-
-      // Alpha feathering pada background
       for(let i = 0; i < fgD.length; i += 4){{
         const dist = Math.max(Math.abs(fgD[i]-bgR), Math.abs(fgD[i+1]-bgG), Math.abs(fgD[i+2]-bgB));
         if(dist < 18){{
@@ -1989,138 +2534,172 @@ function processUploadedFile(file, category){{
         }}
       }}
       fgCtx.putImageData(fgData, 0, 0);
+    }} else {{
+      fgCtx.drawImage(img, 0, 0, gw, gh);
+    }}
+  }} catch(e) {{
+    fgCtx.drawImage(img, 0, 0, gw, gh);
+  }}
 
-      // Posisikan lurus sempurna di tengah X=256
-      const maxW = category === 'top' ? 290 : 320;
-      const maxH = category === 'top' ? 360 : 360;
-      const scaleFactor = Math.min(maxW / gw, maxH / gh, 1.2);
-      const targetW = Math.round(gw * scaleFactor);
-      const targetH = Math.round(gh * scaleFactor);
-      const targetX = Math.round((512 - targetW) / 2); // Tepat lurus di tengah (X=256)
-      const targetY = category === 'top' ? 45 : 20;
+  const maxW = category === 'top' ? 290 : 320;
+  const maxH = category === 'top' ? 360 : 360;
+  const scaleFactor = Math.min(maxW / gw, maxH / gh, 1.2);
+  const targetW = Math.round(gw * scaleFactor);
+  const targetH = Math.round(gh * scaleFactor);
+  const targetX = Math.round((512 - targetW) / 2);
+  const targetY = category === 'top' ? 45 : 20;
 
-      ctx.drawImage(fgC, targetX, targetY, targetW, targetH);
+  ctx.drawImage(fgC, targetX, targetY, targetW, targetH);
 
-      // Buat kain sleeve/leg yang matching
-      const subCanvas = document.createElement('canvas');
-      subCanvas.width = 512;
-      subCanvas.height = 512;
-      const subCtx = subCanvas.getContext('2d');
-      subCtx.fillStyle = `rgb(${{fabricR}}, ${{fabricG}}, ${{fabricB}})`;
-      subCtx.fillRect(0, 0, 512, 512);
+  const subCanvas = document.createElement('canvas');
+  subCanvas.width = 512;
+  subCanvas.height = 512;
+  const subCtx = subCanvas.getContext('2d');
+  subCtx.fillStyle = `rgb(${{fabricR}}, ${{fabricG}}, ${{fabricB}})`;
+  subCtx.fillRect(0, 0, 512, 512);
 
-      // Buat material Three.js
-      const mainTex = new THREE.CanvasTexture(canvas);
-      mainTex.encoding = THREE.sRGBEncoding;
-      mainTex.generateMipmaps = true;
-      mainTex.minFilter = THREE.LinearMipmapLinearFilter;
-      mainTex.magFilter = THREE.LinearFilter;
-      if(renderer && renderer.capabilities) mainTex.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 16);
-      mainTex.wrapS = THREE.RepeatWrapping;
-      mainTex.wrapT = THREE.ClampToEdgeWrapping;
-      mainTex.offset.set(0, 0);
+  const mainTex = new THREE.CanvasTexture(canvas);
+  mainTex.encoding = THREE.sRGBEncoding;
+  mainTex.generateMipmaps = true;
+  mainTex.minFilter = THREE.LinearMipmapLinearFilter;
+  mainTex.magFilter = THREE.LinearFilter;
+  if(renderer && renderer.capabilities) mainTex.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 16);
+  mainTex.wrapS = THREE.RepeatWrapping;
+  mainTex.wrapT = THREE.ClampToEdgeWrapping;
+  mainTex.offset.set(0, 0);
 
-      const subTex = new THREE.CanvasTexture(subCanvas);
-      subTex.encoding = THREE.sRGBEncoding;
-      subTex.generateMipmaps = true;
-      subTex.minFilter = THREE.LinearMipmapLinearFilter;
-      subTex.magFilter = THREE.LinearFilter;
-      if(renderer && renderer.capabilities) subTex.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 16);
-      subTex.wrapS = THREE.RepeatWrapping;
-      subTex.wrapT = THREE.RepeatWrapping;
+  const subTex = new THREE.CanvasTexture(subCanvas);
+  subTex.encoding = THREE.sRGBEncoding;
+  subTex.generateMipmaps = true;
+  subTex.minFilter = THREE.LinearMipmapLinearFilter;
+  subTex.magFilter = THREE.LinearFilter;
+  if(renderer && renderer.capabilities) subTex.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 16);
+  subTex.wrapS = THREE.RepeatWrapping;
+  subTex.wrapT = THREE.RepeatWrapping;
 
-      const newTopMat = {{
-        torso: new THREE.MeshStandardMaterial({{
-          color: 0xffffff,
-          map: mainTex,
-          normalMap: normalTextures.top_wrinkles || null,
-          normalScale: new THREE.Vector2(0.8, 0.8),
-          roughness: 0.76,
-          metalness: 0.03,
-          polygonOffset: true,
-          polygonOffsetFactor: -1.0,
-          polygonOffsetUnits: -4.0,
-          side: THREE.DoubleSide
-        }}),
-        sleeve: new THREE.MeshStandardMaterial({{
-          color: 0xffffff,
-          map: subTex,
-          roughness: 0.76,
-          metalness: 0.03,
-          polygonOffset: true,
-          polygonOffsetFactor: -1.0,
-          polygonOffsetUnits: -4.0,
-          side: THREE.DoubleSide
-        }}),
-        mainTex: mainTex
-      }};
+  const newTopMat = {{
+    torso: new THREE.MeshStandardMaterial({{
+      color: 0xffffff,
+      map: mainTex,
+      normalMap: normalTextures.top_wrinkles || null,
+      normalScale: new THREE.Vector2(0.8, 0.8),
+      roughness: 0.76,
+      metalness: 0.03,
+      polygonOffset: true,
+      polygonOffsetFactor: -2.0,
+      polygonOffsetUnits: -4.0,
+      side: THREE.DoubleSide
+    }}),
+    sleeve: new THREE.MeshStandardMaterial({{
+      color: 0xffffff,
+      map: subTex,
+      roughness: 0.76,
+      metalness: 0.03,
+      polygonOffset: true,
+      polygonOffsetFactor: -2.0,
+      polygonOffsetUnits: -4.0,
+      side: THREE.DoubleSide
+    }}),
+    mainTex: mainTex
+  }};
 
-      const newBotMat = {{
-        waist: new THREE.MeshStandardMaterial({{
-          color: 0xffffff,
-          map: mainTex,
-          normalMap: normalTextures.pants_wrinkles || null,
-          normalScale: new THREE.Vector2(0.85, 0.85),
-          roughness: 0.80,
-          metalness: 0.03,
-          polygonOffset: true,
-          polygonOffsetFactor: -1.0,
-          polygonOffsetUnits: -4.0,
-          side: THREE.DoubleSide
-        }}),
-        leg: new THREE.MeshStandardMaterial({{
-          color: 0xffffff,
-          map: subTex,
-          roughness: 0.80,
-          metalness: 0.03,
-          polygonOffset: true,
-          polygonOffsetFactor: -1.0,
-          polygonOffsetUnits: -4.0,
-          side: THREE.DoubleSide
-        }}),
-        mainTex: mainTex
-      }};
+  const newBotMat = {{
+    waist: new THREE.MeshStandardMaterial({{
+      color: 0xffffff,
+      map: mainTex,
+      normalMap: normalTextures.pants_wrinkles || null,
+      normalScale: new THREE.Vector2(0.85, 0.85),
+      roughness: 0.80,
+      metalness: 0.03,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.0,
+      polygonOffsetUnits: -2.0,
+      side: THREE.DoubleSide
+    }}),
+    leg: new THREE.MeshStandardMaterial({{
+      color: 0xffffff,
+      map: subTex,
+      roughness: 0.80,
+      metalness: 0.03,
+      polygonOffset: true,
+      polygonOffsetFactor: -1.0,
+      polygonOffsetUnits: -2.0,
+      side: THREE.DoubleSide
+    }}),
+    mainTex: mainTex
+  }};
 
+  let thumbB64 = "";
+  try {{
+    thumbB64 = canvas.toDataURL('image/jpeg', 0.85);
+  }} catch(e) {{
+    thumbB64 = img.src;
+  }}
+
+  if(category === 'top'){{
+    topMaterials.push(newTopMat);
+    catalog.tops.push({{
+      id: 'custom_top_' + Date.now(),
+      name: prodName,
+      price: "Pilihan Anda",
+      desc: "Foto produk pakaian yang diproyeksikan langsung ke model 3D.",
+      thumb_b64: thumbB64
+    }});
+    fillProds('topProds', 'top', catalog.tops);
+    switchTopProduct(topMaterials.length - 1);
+    [...document.getElementById('topProds').children].forEach((c, idx) => {{
+      c.classList.toggle('on', idx === topMaterials.length - 1);
+    }});
+  }} else {{
+    botMaterials.push(newBotMat);
+    catalog.bottoms.push({{
+      id: 'custom_bot_' + Date.now(),
+      name: prodName,
+      price: "Pilihan Anda",
+      desc: "Foto produk celana yang diproyeksikan langsung ke model 3D.",
+      thumb_b64: thumbB64
+    }});
+    fillProds('botProds', 'bot', catalog.bottoms);
+    switchBottomProduct(botMaterials.length - 1);
+    [...document.getElementById('botProds').children].forEach((c, idx) => {{
+      c.classList.toggle('on', idx === botMaterials.length - 1);
+    }});
+  }}
+
+  activeCustomTex = mainTex;
+  if(tuneBox) tuneBox.style.display = 'block';
+  resetTuneSliders();
+}}
+
+function processUploadedFile(file, category){{
+  const reader = new FileReader();
+  reader.onload = function(evt){{
+    const img = new Image();
+    img.onload = function(){{
       const prodName = file.name.replace(/\.[^/.]+$/, "") + " (Kustom)";
-      const thumbB64 = canvas.toDataURL('image/jpeg', 0.85);
-
-      if(category === 'top'){{
-        topMaterials.push(newTopMat);
-        catalog.tops.push({{
-          id: 'custom_top_' + Date.now(),
-          name: prodName,
-          price: "Pilihan Anda",
-          desc: "Foto produk pakaian yang diunggah pengguna. Posisi grafis dipasang lurus simetris di tengah dada tanpa garis potongan.",
-          thumb_b64: thumbB64
-        }});
-        fillProds('topProds', 'top', catalog.tops);
-        switchTopProduct(topMaterials.length - 1);
-        [...document.getElementById('topProds').children].forEach((c, idx) => {{
-          c.classList.toggle('on', idx === topMaterials.length - 1);
-        }});
-      }} else {{
-        botMaterials.push(newBotMat);
-        catalog.bottoms.push({{
-          id: 'custom_bot_' + Date.now(),
-          name: prodName,
-          price: "Pilihan Anda",
-          desc: "Foto produk celana yang diunggah pengguna. Ban pinggang dipasang lurus simetris di pinggang manekin tanpa garis potongan.",
-          thumb_b64: thumbB64
-        }});
-        fillProds('botProds', 'bot', catalog.bottoms);
-        switchBottomProduct(botMaterials.length - 1);
-        [...document.getElementById('botProds').children].forEach((c, idx) => {{
-          c.classList.toggle('on', idx === botMaterials.length - 1);
-        }});
-      }}
-
-      activeCustomTex = mainTex;
-      tuneBox.style.display = 'block';
-      resetTuneSliders();
+      applyGarmentImage(img, prodName, category);
     }};
     img.src = evt.target.result;
   }};
   reader.readAsDataURL(file);
+}}
+
+function loadGarmentFromUrl(imageUrl, prodName, category){{
+  if(!imageUrl) return;
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = function(){{
+    applyGarmentImage(img, prodName || "Outfit Terpilih", category || "top");
+  }};
+  img.onerror = function(){{
+    console.warn("Gagal memuat URL gambar secara crossOrigin, mencoba fallback:", imageUrl);
+    const fallbackImg = new Image();
+    fallbackImg.onload = function(){{
+      applyGarmentImage(fallbackImg, prodName || "Outfit Terpilih", category || "top");
+    }};
+    fallbackImg.src = imageUrl;
+  }};
+  img.src = imageUrl;
 }}
 
 function resetTuneSliders(){{
@@ -2151,10 +2730,301 @@ tuneY.addEventListener('input', applyTune);
 tuneScale.addEventListener('input', applyTune);
 document.getElementById('btnResetTune').addEventListener('click', resetTuneSliders);
 
+function setGender(g){{
+  if(!g) return;
+  state.gender = g;
+  document.querySelectorAll('#charGender button').forEach(b => b.classList.toggle('on', b.dataset.val === g));
+  if(g === 'female'){{
+    state.beard = 'clean';
+  }}
+  buildAllGeometries();
+}}
+
+function setSkinTone(k){{
+  if(!k || !SKIN_TONES[k]) return;
+  state.skinTone = k;
+  document.querySelectorAll('#skinTonePicker .color-dot').forEach((d, i) => {{
+    const key = Object.keys(SKIN_TONES)[i];
+    d.classList.toggle('on', key === k);
+  }});
+  updateCharacterSkin();
+}}
+
+function selectProdCard(boxId, idx){{
+  const box = document.getElementById(boxId);
+  if(!box) return;
+  [...box.children].forEach((c, i) => c.classList.toggle('on', i === idx));
+}}
+
+function showToast(msg){{
+  const t = document.getElementById('toastMsg');
+  if(!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}}
+
+/* ---------- Integrasi Akun & Sinkronisasi Eksternal ---------- */
+function initIntegration(){{
+  // 1. Baca Akun & Data Diri dari LocalStorage
+  let u = null;
+  let activeProfile = null;
+  try {{
+    const userRaw = localStorage.getItem("outfit_req_user");
+    if(userRaw) u = JSON.parse(userRaw);
+    const profRaw = localStorage.getItem("outfit_req_body_profiles");
+    if(profRaw){{
+      const profs = JSON.parse(profRaw);
+      if(Array.isArray(profs) && profs.length > 0){{
+        activeProfile = profs.find(p => p.isActive) || profs[0];
+      }}
+    }}
+  }} catch(e){{
+    console.warn("Storage read error:", e);
+  }}
+
+  // Helper cek status Premium pengguna
+  function checkIsUserPremium(userObj){{
+    if(!userObj) return false;
+    if(userObj.isPremium === true) return true;
+    const tier = (userObj.tier || "").toString().toLowerCase().trim();
+    return tier.includes("premium");
+  }}
+
+  const isPrem = checkIsUserPremium(u);
+  const statusPill = document.getElementById('userStatusText');
+  const userDot = document.getElementById('userStatusDot');
+  const lockOverlay = document.getElementById('premiumLockedOverlay');
+
+  if(statusPill){{
+    if(isPrem){{
+      statusPill.innerHTML = `★ Premium: <b>${{u.name || 'Pengguna'}}</b>`;
+      if(userDot) userDot.style.background = '#1f8247';
+    }} else if(u && u.name){{
+      statusPill.innerHTML = `★ Khusus Premium: <b>${{u.name}} (Free)</b>`;
+      if(userDot) userDot.style.background = '#dc2626';
+    }} else {{
+      statusPill.innerHTML = `★ Khusus Member Premium`;
+      if(userDot) userDot.style.background = '#dc2626';
+    }}
+  }}
+
+  // Gerbang Keamanan Premium: Kunci Studio 3D jika bukan akun Premium
+  if(!isPrem){{
+    document.body.classList.add('is-locked');
+    if(lockOverlay) lockOverlay.style.display = 'flex';
+  }} else {{
+    document.body.classList.remove('is-locked');
+    if(lockOverlay) lockOverlay.style.display = 'none';
+  }}
+
+  // Set Profile ke Sliders
+  if(activeProfile){{
+    if(activeProfile.tb) setSlider('H', activeProfile.tb);
+    if(activeProfile.bb) setSlider('W', activeProfile.bb);
+    if(activeProfile.ld) setSlider('C', activeProfile.ld);
+    if(activeProfile.lp) setSlider('P', activeProfile.lp);
+    if(activeProfile.shoulder) setSlider('B', activeProfile.shoulder);
+    if(activeProfile.gender) setGender(activeProfile.gender);
+    if(activeProfile.skinTone) setSkinTone(activeProfile.skinTone);
+    if(autoSyncCheckbox) autoSyncCheckbox.checked = false;
+  }}
+
+  // 2. Baca Query Parameters
+  const params = new URLSearchParams(window.location.search);
+
+  // Body measurements override
+  if(params.get('h')) setSlider('H', parseFloat(params.get('h')));
+  if(params.get('w')) setSlider('W', parseFloat(params.get('w')));
+  if(params.get('c')) setSlider('C', parseFloat(params.get('c')));
+  if(params.get('p')) setSlider('P', parseFloat(params.get('p')));
+  if(params.get('b')) setSlider('B', parseFloat(params.get('b')));
+  if(params.get('gender')) setGender(params.get('gender'));
+  if(params.get('skin')) setSkinTone(params.get('skin'));
+
+  // Top / Bot product selection
+  if(params.has('top')){{
+    const v = params.get('top');
+    const idx = parseInt(v, 10);
+    if(!isNaN(idx) && catalog.tops[idx]){{
+      switchTopProduct(idx);
+      selectProdCard('topProds', idx);
+    }} else {{
+      const found = catalog.tops.findIndex(t => t.id === v || (t.name && t.name.toLowerCase().includes(v.toLowerCase())));
+      if(found !== -1){{
+        switchTopProduct(found);
+        selectProdCard('topProds', found);
+      }}
+    }}
+  }}
+  if(params.has('bot')){{
+    const v = params.get('bot');
+    const idx = parseInt(v, 10);
+    if(!isNaN(idx) && catalog.bottoms[idx]){{
+      switchBottomProduct(idx);
+      selectProdCard('botProds', idx);
+    }} else {{
+      const found = catalog.bottoms.findIndex(b => b.id === v || (b.name && b.name.toLowerCase().includes(v.toLowerCase())));
+      if(found !== -1){{
+        switchBottomProduct(found);
+        selectProdCard('botProds', found);
+      }}
+    }}
+  }}
+
+  // Custom garment URL (Gunakan dari kartu rekomendasi atau koleksi)
+  if(params.get('custom_img')){{
+    const imgUrl = decodeURIComponent(params.get('custom_img'));
+    const pName = params.get('custom_name') ? decodeURIComponent(params.get('custom_name')) : "Outfit Terpilih";
+    const pCat = params.get('custom_cat') || 'top';
+    loadGarmentFromUrl(imgUrl, pName, pCat);
+  }}
+
+  // Theme Sync
+  const tParam = params.get('theme') || localStorage.getItem('outfit_req_theme');
+  if(tParam === 'dark'){{
+    document.documentElement.setAttribute('data-theme', 'dark');
+    setBgPreset('dark');
+  }} else if(tParam === 'light'){{
+    document.documentElement.setAttribute('data-theme', 'light');
+    setBgPreset('neutral');
+  }}
+
+  // Referrer & Back Button
+  const ref = params.get('ref');
+  const btnBack = document.getElementById('btnBackToWeb');
+  const backText = document.getElementById('backNavText');
+  const btnLockBack = document.getElementById('btnLockBack');
+  let backUrl = '../WEB EBD/rekomendasi.html';
+  let backLabel = 'Kembali ke Rekomendasi';
+
+  if(ref === 'account'){{
+    backUrl = '../WEB EBD/account.html';
+    backLabel = 'Kembali ke Akun';
+  }} else if(ref === 'home'){{
+    backUrl = '../WEB EBD/index.html';
+    backLabel = 'Kembali ke Beranda';
+  }} else if(ref === 'showcase'){{
+    backUrl = '../WEB EBD/showcase.html';
+    backLabel = 'Kembali ke Showcase';
+  }} else if(ref === 'tutorial'){{
+    backUrl = '../WEB EBD/tutorial.html';
+    backLabel = 'Kembali ke Panduan';
+  }}
+
+  if(btnBack && backText){{
+    btnBack.href = backUrl;
+    backText.textContent = backLabel;
+  }}
+  if(btnLockBack){{
+    btnLockBack.href = backUrl;
+    btnLockBack.textContent = backLabel;
+  }}
+
+  // Embedded mode
+  if(params.get('embed') === 'true' || window.self !== window.top){{
+    document.body.classList.add('is-embedded');
+  }}
+
+  // Re-build geometries dengan nilai terbaru
+  requestBuildGeometries();
+}}
+
+// 3. postMessage API Listener untuk interaksi iframe dua arah
+window.addEventListener('message', function(ev){{
+  const data = ev.data;
+  if(!data || typeof data !== 'object') return;
+  if(data.type === 'SET_BODY_PROFILE' && data.profile){{
+    const p = data.profile;
+    if(p.tb) setSlider('H', p.tb);
+    if(p.bb) setSlider('W', p.bb);
+    if(p.ld) setSlider('C', p.ld);
+    if(p.lp) setSlider('P', p.lp);
+    if(p.shoulder) setSlider('B', p.shoulder);
+    if(p.gender) setGender(p.gender);
+    if(p.skinTone) setSkinTone(p.skinTone);
+    requestBuildGeometries();
+  }} else if(data.type === 'LOAD_CUSTOM_GARMENT'){{
+    loadGarmentFromUrl(data.imageUrl, data.name || "Outfit Rekomendasi", data.category || "top");
+  }} else if(data.type === 'SET_THEME'){{
+    if(data.theme === 'dark'){{
+      document.documentElement.setAttribute('data-theme', 'dark');
+      setBgPreset('dark');
+    }} else {{
+      document.documentElement.setAttribute('data-theme', 'light');
+      setBgPreset('neutral');
+    }}
+  }}
+}});
+
+// 4. Simpan Kombinasi ke Koleksi Akun
+function saveCurrentComboToAccount(){{
+  try {{
+    const curTop = catalog.tops[state.top] || {{ name: "Atasan Pilihan", price: "Rp 149.000" }};
+    const curBot = catalog.bottoms[state.bot] || {{ name: "Bawahan Pilihan", price: "Rp 249.000" }};
+    const comboTitle = `${{curTop.name}} & ${{curBot.name}}`;
+    const thumb = curTop.thumb_b64 || curTop.thumb_url || "images/card1.jpg";
+
+    const savedRaw = localStorage.getItem("outfit_req_saved_photos");
+    let savedList = savedRaw ? JSON.parse(savedRaw) : [];
+
+    const newEntry = {{
+      id: "combo_3d_" + Date.now(),
+      title: comboTitle,
+      category: "Studio 3D Fitting",
+      style: "3D Visualized",
+      priceDisplay: `${{curTop.price}} + ${{curBot.price}}`,
+      priceTotal: 398000,
+      store: "Orec Official Studio",
+      storeUrl: "../Premium 3D/index.html",
+      image: thumb,
+      dateSaved: new Date().toISOString(),
+      source: "3d-studio",
+      user_tier: "premium"
+    }};
+
+    savedList.unshift(newEntry);
+    localStorage.setItem("outfit_req_saved_photos", JSON.stringify(savedList));
+
+    const userRaw = localStorage.getItem("outfit_req_user");
+    if(userRaw){{
+      const u = JSON.parse(userRaw);
+      if(u && u.email){{
+        const uKey = "outfit_req_saved_photos_" + u.email.toLowerCase();
+        localStorage.setItem(uKey, JSON.stringify(savedList));
+      }}
+    }}
+
+    showToast("Kombinasi Outfit 3D berhasil disimpan ke Koleksi Akun!");
+  }} catch(e){{
+    console.error("Gagal simpan:", e);
+    showToast("Outfit tersimpan di sesi Anda.");
+  }}
+}}
+
+const btnSaveCombo = document.getElementById('btnSaveCombo');
+if(btnSaveCombo){{
+  btnSaveCombo.addEventListener('click', saveCurrentComboToAccount);
+}}
+
+// Theme Toggle Button
+const themeToggleBtn = document.getElementById('themeBtn');
+if(themeToggleBtn){{
+  themeToggleBtn.addEventListener('click', () => {{
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const nextTheme = isDark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('outfit_req_theme', nextTheme);
+    setBgPreset(nextTheme === 'dark' ? 'dark' : 'neutral');
+  }});
+}}
+
 /* ---------- Eksekusi Awal ---------- */
 resize();
+initGLBHumanModels();
 buildAllGeometries();
 resetCam();
+initIntegration();
 
 (function loop(){{
   requestAnimationFrame(loop);
@@ -2167,10 +3037,17 @@ window.__VIEWER__ = {{
   topGroup,
   botGroup,
   mannequinGroup,
+  glbHumanGroup,
+  glbManModel,
+  glbWomanModel,
   switchTopProduct,
   switchBottomProduct,
   topMaterials,
-  botMaterials
+  botMaterials,
+  loadGarmentFromUrl,
+  setGender,
+  setSkinTone,
+  saveCurrentComboToAccount
 }};
 }})();
 </script>
@@ -2178,7 +3055,10 @@ window.__VIEWER__ = {{
 </html>
 '''
 
-with open('index.html', 'w', encoding='utf-8') as f:
+with open(os.path.join(BASE_DIR, 'index.html'), 'w', encoding='utf-8') as f:
     f.write(html_content)
 
-print(f"Selesai! index.html berhasil dikompilasi ({len(html_content)} bytes).")
+with open(os.path.join(BASE_DIR, 'Fitur Premium.html'), 'w', encoding='utf-8') as f:
+    f.write(html_content)
+
+print(f"Selesai! index.html & Fitur Premium.html berhasil dikompilasi ({len(html_content)} bytes).")
