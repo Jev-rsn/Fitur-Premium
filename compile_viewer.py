@@ -39,7 +39,8 @@ html_content = f'''
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Fitur Premium: Visualisasi Body 3D Realistis</title>
+<title>Orec Studio 3D — Visualisasi Body 3D Realistis</title>
+<link rel="icon" type="image/png" href="../WEB EBD/images/logo_orec.png">
 <style>
 :root{{
   --bg:#FFFFFF;--stage:#E2E6EC;--ink:#141316;--mut:#625c64;--line:#ded6cc;
@@ -411,6 +412,7 @@ body.is-locked aside{{
       <span id="backNavText">Rekomendasi</span>
     </a>
     <div class="brand-title-wrap">
+      <img src="../WEB EBD/images/logo_orec.png" alt="Orec Logo" style="width:24px; height:24px; border-radius:50%; object-fit:cover;" />
       <span class="brand-main">Orec</span>
       <span class="brand-badge-tag">STUDIO 3D</span>
     </div>
